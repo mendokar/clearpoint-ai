@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "./AuthProvider";
 import { Notice } from "@/components/ui/Notice";
-import { Spinner } from "@/components/ui/Spinner";
+import { SkeletonGroup, SkeletonRow } from "@/components/ui/Skeleton";
 
 /** Guarda de ruta en cliente. La protección real de los datos está en las reglas de Firestore. */
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -25,7 +25,14 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       </Notice>
     );
   }
-  if (loading || !user) return <Spinner label="Comprobando tu sesión…" />;
+  if (loading || !user) {
+    return (
+      <SkeletonGroup label="Comprobando tu sesión…" className="grid gap-4">
+        <SkeletonRow media={false} />
+        <SkeletonRow media={false} />
+      </SkeletonGroup>
+    );
+  }
   return <>{children}</>;
 }
 
