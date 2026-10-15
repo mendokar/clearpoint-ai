@@ -86,11 +86,11 @@ Todas se ejecutan sin red ni credenciales reales: los servicios externos están 
 
 | Suite | Comando | Pruebas | Estado a 15/10/2026 |
 |---|---|---|---|
-| Web (Vitest) | `cd web && npm test` | 305 | ✅ Todas pasan |
+| Web (Vitest) | `cd web && npm test` | 315 | ✅ Todas pasan |
 | Asistente (pytest) | `cd agent && .venv/bin/python -m pytest --cov=app` | 138 | ✅ Todas pasan |
 | Reglas de Firestore y Storage (emulador) | `cd firebase && npm run test:rules` | 32 | ✅ Todas pasan. Requiere Java 21 en `JAVA_HOME` |
 | Scripts (node:test) | `cd scripts && npm test` | 10 | ✅ Todas pasan |
-| **Total** | | **485** | |
+| **Total** | | **495** | |
 
 ### Web
 
@@ -184,6 +184,7 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 | CP-PAG-05 | Comprar con una cuenta cuyo buzón puedas revisar. Con un correo ajeno, como demo1@gmail.com, no se puede comprobar | Llega el email "Pedido CP-000xxx confirmado" desde Colchones Contoso. Revisar también spam | A |
 | CP-PAG-06 | Pagar con la tarjeta 3155 | Stripe pide 3D Secure. Al aprobarlo se crea el pedido | B |
 | CP-PAG-07 | Recargar varias veces la página de éxito | No se duplica el pedido | M |
+| CP-PAG-08 | Con sesión, abrir `/checkout/exito?session_id=cs_test_inventado789` | "No encontramos este pago". No dice que el pago se completó y el carrito no se vacía. Sin sesión pide iniciar sesión sin afirmar que hubo pago | A |
 
 ### 5.5 Mis pedidos y aislamiento (R2)
 
@@ -262,6 +263,7 @@ Requiere una cuenta con el rol de administrador.
 | CP-SEG-03 | Buscar claves en el código que descarga el navegador | Solo aparecen valores públicos: configuración web de Firebase y URLs | A |
 | CP-SEG-04 | Llamar al asistente desde otra web o con un token falso | CORS lo bloquea y el token falso recibe 401 | M |
 | CP-SEG-05 | Enviar al chat un mensaje con `<script>alert(1)</script>` | Se muestra como texto y no se ejecuta | A |
+| CP-SEG-06 | Enviar al chat un identificador de 80 caracteres sin espacios | Se parte dentro de la burbuja y no aparece scroll horizontal | B |
 
 ---
 
