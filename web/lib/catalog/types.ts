@@ -14,6 +14,12 @@ export const productOptionSchema = z.object({
   values: z.array(z.string()),
 });
 
+export const productBadgeSchema = z.object({
+  text: z.string().min(1).max(24),
+  tone: z.enum(["destacado", "nuevo"]).default("destacado"),
+});
+export type ProductBadge = z.infer<typeof productBadgeSchema>;
+
 export const productSchema = z
   .object({
     slug: z.string().regex(/^[a-z0-9-]+$/),
@@ -30,6 +36,8 @@ export const productSchema = z
     priceFrom: z.number().optional(),
     currency: z.string().default("EUR"),
     features: z.array(z.string()).default([]),
+    /** Etiqueta de la tarjeta en la home ("Más vendido", "Nuevo"...). Se edita en el panel de administración. */
+    badge: productBadgeSchema.nullable().optional().default(null),
     active: z.boolean().default(true),
   })
   .passthrough();

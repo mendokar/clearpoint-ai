@@ -7,15 +7,22 @@ import { Reviews } from "@/components/home/Reviews";
 import { CoresTable } from "@/components/product/CoresTable";
 import { ProductConfigurator } from "@/components/product/ProductConfigurator";
 import { ProductGallery } from "@/components/product/ProductGallery";
-import { getCatalog, localSlugs } from "@/lib/catalog/repository";
+import { activeSlugs, getCatalog } from "@/lib/catalog/repository";
 import { lowestPrice } from "@/lib/catalog/types";
 import { formatPrice } from "@/lib/format";
 
 export const revalidate = 300;
+// Los productos creados desde el panel después del build se generan bajo demanda (y se cachean).
 export const dynamicParams = true;
 
-export function generateStaticParams() {
-  return localSlugs().map((slug) => ({ slug }));
+/** Slugs de Firestore cuando hay credenciales (JSON solo en desarrollo sin credenciales). */
+export async function generateStaticParams() {
+  try {
+    return (await activeSlugs()).map((slug) => ({ slug }));
+  } catch {
+    // Firestore caído durante el build: las fichas se generan bajo demanda, no se usa el JSON.
+    return [];
+  }
 }
 
 type Params = { params: Promise<{ slug: string }> };

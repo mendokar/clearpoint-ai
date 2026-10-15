@@ -297,6 +297,10 @@
         "Fabricado en Envigado (Antioquia, Colombia)",
         "Medida a medida bajo pedido (unos 30 días)"
       ],
+      "badge": {
+        "text": "Nuevo",
+        "tone": "nuevo"
+      },
       "active": true
     },
     {
@@ -597,6 +601,10 @@
         "Fabricado en Envigado (Antioquia, Colombia)",
         "Medida a medida bajo pedido (unos 30 días)"
       ],
+      "badge": {
+        "text": "Más vendido",
+        "tone": "destacado"
+      },
       "active": true
     }
   ]

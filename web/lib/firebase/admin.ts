@@ -45,13 +45,20 @@ export function getAdminAuth() {
   return getAuth(getAdminApp());
 }
 
-/** Extrae y verifica el ID token del header Authorization. Devuelve null si no es válido. */
-export async function verifyBearer(authorization: string | null): Promise<DecodedIdToken | null> {
+/**
+ * Extrae y verifica el ID token del header Authorization. Devuelve null si no es válido.
+ * `checkRevoked` consulta además a Firebase Auth si las sesiones del usuario se han revocado (lo usan las
+ * rutas de administración, para que quitar el rol con `set-admin.ts --revoke` surta efecto al momento).
+ */
+export async function verifyBearer(
+  authorization: string | null,
+  opts: { checkRevoked?: boolean } = {},
+): Promise<DecodedIdToken | null> {
   if (!authorization?.startsWith("Bearer ")) return null;
   const token = authorization.slice("Bearer ".length).trim();
   if (!token || token.length > 4096) return null;
   try {
-    return await getAdminAuth().verifyIdToken(token);
+    return await getAdminAuth().verifyIdToken(token, opts.checkRevoked ?? false);
   } catch {
     return null;
   }

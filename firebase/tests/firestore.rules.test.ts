@@ -83,6 +83,20 @@ describe("users", () => {
   });
 });
 
+describe("rol de administrador (custom claim admin)", () => {
+  // El panel lee y escribe SOLO a través de /api/admin (Admin SDK). El claim no abre nada en el cliente.
+  const admin = () => env.authenticatedContext("root", { admin: true }).firestore();
+  it("un admin no puede escribir productos ni pedidos desde el cliente", async () => {
+    await assertFails(setDoc(doc(admin(), "products/colchon-cafetal"), { name: "hack" }));
+    await assertFails(deleteDoc(doc(admin(), "products/colchon-cafetal")));
+    await assertFails(updateDoc(doc(admin(), "orders/cs_test_alice"), { status: "shipped" }));
+  });
+  it("un admin no puede leer pedidos ajenos ni listarlos desde el cliente", async () => {
+    await assertFails(getDoc(doc(admin(), "orders/cs_test_alice")));
+    await assertFails(getDocs(collection(admin(), "orders")));
+  });
+});
+
 describe("colecciones no declaradas", () => {
   it("counters y cualquier otra ruta están denegadas", async () => {
     await assertFails(getDoc(doc(alice(), "counters/orders")));
