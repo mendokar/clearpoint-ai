@@ -1,0 +1,49 @@
+# ── Secretos ───────────────────────────────────────────────────────────────────
+.env*
+!.env.example
+*.pem
+*.key
+*.p12
+service-account*.json
+*-service-account*.json
+*firebase-adminsdk*.json
+credentials*.json
+gcloud-credentials*.json
+
+# ── Node / Next.js ─────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+npm-debug.log*
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Firebase ───────────────────────────────────────────────────────────────────
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+database-debug.log*
+pubsub-debug.log*
+
+# ── Sistema / editores ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# ── Material de referencia de Clearpoint (HTML del sitio de terceros, no se versiona) ──
+webbase/

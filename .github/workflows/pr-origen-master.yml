@@ -1,0 +1,27 @@
+# Garantiza que a master solo se llega mediante un pull request desde develop.
+# La regla "master protegida" del repositorio exige que este check pase antes de fusionar.
+name: Origen del PR a master
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  solo-desde-develop:
+    name: solo-desde-develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comprobar la rama de origen
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ] || [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            echo "::error::A master solo se fusiona desde develop de este repositorio. Origen recibido: $HEAD_REPO:$HEAD_REF"
+            exit 1
+          fi
+          echo "Origen correcto: $HEAD_REPO:$HEAD_REF"

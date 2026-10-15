@@ -1,0 +1,603 @@
+{
+  "products": [
+    {
+      "slug": "colchon-cafetal",
+      "name": "Colchón Cafetal",
+      "shortDescription": "Viscoelástico de firmeza media, pensado para quien duerme de lado.",
+      "description": "El Colchón Cafetal combina capas de espuma viscoelástica que se adaptan a hombros y caderas, aliviando los puntos de presión de quien duerme de lado. Firmeza media. Fabricado en nuestro taller de Envigado (Antioquia) y enviado desde nuestro almacén de Madrid.",
+      "images": [
+        "/images/colchon-cafetal-1.jpg",
+        "/images/colchon-cafetal-2.jpg"
+      ],
+      "options": [
+        {
+          "name": "Medida",
+          "values": [
+            "90×190",
+            "135×190",
+            "150×190",
+            "160×200",
+            "A medida"
+          ]
+        },
+        {
+          "name": "Núcleo",
+          "values": [
+            "Brisa",
+            "Ceiba+"
+          ]
+        },
+        {
+          "name": "Funda",
+          "values": [
+            "Algodón Tolima",
+            "Térmica Páramo"
+          ]
+        }
+      ],
+      "optionDetails": {
+        "Núcleo": {
+          "Brisa": {
+            "tipo": "Esencial",
+            "alturaCm": 22,
+            "pesoMaxPorPersonaKg": 100,
+            "capas": 3,
+            "zonasConfort": 3,
+            "garantiaAnos": 5
+          },
+          "Ceiba+": {
+            "tipo": "Reforzado",
+            "alturaCm": 26,
+            "pesoMaxPorPersonaKg": 130,
+            "capas": 5,
+            "zonasConfort": 7,
+            "garantiaAnos": 10,
+            "extra": "Canales de ventilación más anchos"
+          }
+        },
+        "Funda": {
+          "Algodón Tolima": {
+            "descripcion": "Tejido de algodón cultivado en el Tolima (Colombia), suave y transpirable. Desenfundable y lavable a 40 °C."
+          },
+          "Térmica Páramo": {
+            "descripcion": "Tejido termorregulador de doble cara: cara cálida para invierno y cara fresca para verano. Desenfundable y lavable a 40 °C."
+          }
+        }
+      },
+      "variants": [
+        {
+          "sku": "CAF-090190-BRI-ALG",
+          "options": {
+            "Medida": "90×190",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 349,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-090190-BRI-TER",
+          "options": {
+            "Medida": "90×190",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 389,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-090190-CEI-ALG",
+          "options": {
+            "Medida": "90×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 459,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-090190-CEI-TER",
+          "options": {
+            "Medida": "90×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 499,
+          "currency": "EUR",
+          "inStock": false
+        },
+        {
+          "sku": "CAF-135190-BRI-ALG",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 449,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-135190-BRI-TER",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 504,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-135190-CEI-ALG",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 599,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-135190-CEI-TER",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 654,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-150190-BRI-ALG",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 499,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-150190-BRI-TER",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 559,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-150190-CEI-ALG",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 659,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-150190-CEI-TER",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 719,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-160200-BRI-ALG",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 559,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-160200-BRI-TER",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 624,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-160200-CEI-ALG",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 739,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-160200-CEI-TER",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 804,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-MEDIDA-BRI-ALG",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 649,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-MEDIDA-BRI-TER",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 729,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-MEDIDA-CEI-ALG",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 859,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAF-MEDIDA-CEI-TER",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 939,
+          "currency": "EUR",
+          "inStock": true
+        }
+      ],
+      "priceFrom": 349,
+      "currency": "EUR",
+      "features": [
+        "Espuma viscoelástica adaptable",
+        "Firmeza media",
+        "Ideal para dormir de lado",
+        "Alivia la presión en hombros y caderas",
+        "Funda desenfundable y lavable",
+        "Fabricado en Envigado (Antioquia, Colombia)",
+        "Medida a medida bajo pedido (unos 30 días)"
+      ],
+      "active": true
+    },
+    {
+      "slug": "colchon-caribe",
+      "name": "Colchón Caribe",
+      "shortDescription": "Muelles ensacados con espuma fresca, firmeza media-alta. Ideal para parejas.",
+      "description": "El Colchón Caribe une muelles ensacados independientes con una capa de espuma fresca de célula abierta. Su firmeza media-alta y la independencia de lechos lo hacen ideal para parejas: los movimientos de uno apenas se notan en el lado del otro. Es nuestro colchón más fresco. Fabricado en Envigado (Antioquia) y enviado desde Madrid.",
+      "images": [
+        "/images/colchon-caribe-1.jpg",
+        "/images/colchon-caribe-2.jpg"
+      ],
+      "options": [
+        {
+          "name": "Medida",
+          "values": [
+            "135×190",
+            "150×190",
+            "160×200",
+            "180×200",
+            "A medida"
+          ]
+        },
+        {
+          "name": "Núcleo",
+          "values": [
+            "Brisa",
+            "Ceiba+"
+          ]
+        },
+        {
+          "name": "Funda",
+          "values": [
+            "Algodón Tolima",
+            "Térmica Páramo"
+          ]
+        }
+      ],
+      "optionDetails": {
+        "Núcleo": {
+          "Brisa": {
+            "tipo": "Esencial",
+            "alturaCm": 22,
+            "pesoMaxPorPersonaKg": 100,
+            "capas": 3,
+            "zonasConfort": 3,
+            "garantiaAnos": 5
+          },
+          "Ceiba+": {
+            "tipo": "Reforzado",
+            "alturaCm": 26,
+            "pesoMaxPorPersonaKg": 130,
+            "capas": 5,
+            "zonasConfort": 7,
+            "garantiaAnos": 10,
+            "extra": "Canales de ventilación más anchos"
+          }
+        },
+        "Funda": {
+          "Algodón Tolima": {
+            "descripcion": "Tejido de algodón cultivado en el Tolima (Colombia), suave y transpirable. Desenfundable y lavable a 40 °C."
+          },
+          "Térmica Páramo": {
+            "descripcion": "Tejido termorregulador de doble cara: cara cálida para invierno y cara fresca para verano. Desenfundable y lavable a 40 °C."
+          }
+        }
+      },
+      "variants": [
+        {
+          "sku": "CAR-135190-BRI-ALG",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 449,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-135190-BRI-TER",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 504,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-135190-CEI-ALG",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 599,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-135190-CEI-TER",
+          "options": {
+            "Medida": "135×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 654,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-150190-BRI-ALG",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 509,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-150190-BRI-TER",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 569,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-150190-CEI-ALG",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 669,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-150190-CEI-TER",
+          "options": {
+            "Medida": "150×190",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 729,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-160200-BRI-ALG",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 579,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-160200-BRI-TER",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 644,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-160200-CEI-ALG",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 759,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-160200-CEI-TER",
+          "options": {
+            "Medida": "160×200",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 824,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-180200-BRI-ALG",
+          "options": {
+            "Medida": "180×200",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 659,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-180200-BRI-TER",
+          "options": {
+            "Medida": "180×200",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 734,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-180200-CEI-ALG",
+          "options": {
+            "Medida": "180×200",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 859,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-180200-CEI-TER",
+          "options": {
+            "Medida": "180×200",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 934,
+          "currency": "EUR",
+          "inStock": false
+        },
+        {
+          "sku": "CAR-MEDIDA-BRI-ALG",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Brisa",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 749,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-MEDIDA-BRI-TER",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Brisa",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 829,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-MEDIDA-CEI-ALG",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Ceiba+",
+            "Funda": "Algodón Tolima"
+          },
+          "price": 959,
+          "currency": "EUR",
+          "inStock": true
+        },
+        {
+          "sku": "CAR-MEDIDA-CEI-TER",
+          "options": {
+            "Medida": "A medida",
+            "Núcleo": "Ceiba+",
+            "Funda": "Térmica Páramo"
+          },
+          "price": 1039,
+          "currency": "EUR",
+          "inStock": true
+        }
+      ],
+      "priceFrom": 449,
+      "currency": "EUR",
+      "features": [
+        "Muelles ensacados independientes",
+        "Espuma fresca de célula abierta",
+        "Firmeza media-alta",
+        "Independencia de lechos, ideal para parejas",
+        "Nuestro colchón más fresco",
+        "Funda desenfundable y lavable",
+        "Fabricado en Envigado (Antioquia, Colombia)",
+        "Medida a medida bajo pedido (unos 30 días)"
+      ],
+      "active": true
+    }
+  ]
+}
