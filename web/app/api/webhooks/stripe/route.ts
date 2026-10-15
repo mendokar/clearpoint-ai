@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { getEmailSender } from "@/lib/email/resend";
+import { getEmailSender } from "@/lib/email/gmail";
 import { getAdminDb, isAdminConfigured } from "@/lib/firebase/admin";
 import { fulfillCheckoutSession } from "@/lib/orders/fulfill";
 import { siteUrlFrom } from "@/lib/site";

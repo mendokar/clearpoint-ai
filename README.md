@@ -51,7 +51,8 @@ Contoso es una tienda online de colchones de adulto con identidad colombiana: ta
 | Pruebas unitarias y de seguridad | `agent/tests`, `web/tests`, `firebase/tests` | ✅ 241 pruebas en verde |
 | Proyecto Firebase con reglas, índices y datos de demo | `firebase/`, `scripts/` | ✅ Activo y verificado |
 | Stripe en modo test | `web/` | ✅ Checkout probado en local y webhook de producción creado |
-| Email y despliegues | — | ⏳ Pendiente |
+| Email de confirmación por Gmail | `web/` | ✅ Envío real probado |
+| Despliegue de la web en Vercel | — | ⏳ Pendiente de variables y de llevar el código a master |
 | Memoria técnica | `docs/` | ⏳ Pendiente |
 
 ---
@@ -255,6 +256,7 @@ Resumen. El detalle está en la sección 8 de [`ARQUITECTURA.md`](ARQUITECTURA.m
 | 15/10/2026 | Asistente con **LangGraph** en cascada en lugar de un bucle con LiteLLM | Más control sobre cada etapa de la respuesta y mejor trazabilidad |
 | 15/10/2026 | Respaldo Anthropic → OpenAI con el mecanismo de LangChain | Encaja con LangGraph y quita una dependencia |
 | 15/10/2026 | Login con **Google** además de correo y contraseña | Petición de producto |
+| 15/10/2026 | Email de confirmación por **Gmail (SMTP)** en lugar de Resend | Resend exige un dominio propio para enviar a cualquier cliente y no lo tenemos |
 | 15/10/2026 | Pruebas unitarias y de seguridad desde el inicio | Garantizar aislamiento entre usuarios y la integridad del pago |
 
 ---
@@ -266,7 +268,7 @@ Se irán ampliando. Las actuales son estas:
 - El límite de mensajes del asistente vive en memoria y no se comparte entre instancias.
 - No hay panel de administración. Los estados de los pedidos se cambian con un script.
 - No hay gestión real de stock ni de impuestos por región.
-- Proveedor de email pendiente. Resend sin dominio verificado solo envía al dueño de la cuenta.
+- El email de confirmación sale de una cuenta de Gmail. Tiene un límite diario de unos 500 envíos y puede acabar en spam. Los usuarios demo tienen correos ficticios, así que para ver el email hay que comprar con una cuenta real o con Google.
 
 ---
 
