@@ -45,10 +45,10 @@ export default async function ProductPage({ params }: Params) {
         <nav aria-label="Migas de pan" className="text-sm text-muted">
           <ol className="m-0 flex list-none flex-wrap gap-2 p-0">
             <li>
-              <Link href="/" className="hover:text-aji-ink">Inicio</Link> /
+              <Link href="/" className="transition-colors hover:text-aji-ink">Inicio</Link> /
             </li>
             <li>
-              <Link href="/#productos" className="hover:text-aji-ink">Colchones</Link> /
+              <Link href="/#productos" className="transition-colors hover:text-aji-ink">Colchones</Link> /
             </li>
             <li aria-current="page" className="text-ink">{product.name}</li>
           </ol>
@@ -57,7 +57,7 @@ export default async function ProductPage({ params }: Params) {
 
       <section className="wrap grid items-start gap-8 py-6 md:grid-cols-[1.05fr_.95fr] md:gap-12 md:py-8">
         <ProductGallery images={product.images} name={product.name} />
-        <div className="flex flex-col gap-6">
+        <div className="enter flex flex-col gap-6">
           <div>
             <span className="eyebrow">Hecho en Envigado · Algodón del Tolima</span>
             <h1 className="mt-2 mb-3 text-[clamp(2.2rem,4.4vw,3.4rem)] font-extrabold tracking-[-.025em]">{product.name}</h1>
@@ -86,7 +86,7 @@ export default async function ProductPage({ params }: Params) {
       <div className="wayuu mt-8" role="presentation" />
 
       <section className="section" aria-labelledby="descripcion-title">
-        <div className="wrap grid gap-10 md:grid-cols-2">
+        <div className="wrap grid gap-10 md:grid-cols-2" data-reveal="stagger">
           <div>
             <span className="eyebrow">Descripción</span>
             <h2 id="descripcion-title" className="mt-2 mb-4 text-[clamp(1.8rem,3.2vw,2.4rem)] font-extrabold">
@@ -113,29 +113,31 @@ export default async function ProductPage({ params }: Params) {
 
       <section className="section flush" aria-labelledby="nucleos-title">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head" data-reveal>
             <div>
               <span className="eyebrow">Núcleos</span>
               <h2 id="nucleos-title">Brisa o Ceiba+: ¿cuál te conviene?</h2>
             </div>
             <p>Ceiba+ es más alto, soporta más peso, tiene más zonas de confort y el doble de garantía.</p>
           </div>
-          <CoresTable product={product} caption={`Comparativa de núcleos del ${product.name}`} />
+          <div data-reveal>
+            <CoresTable product={product} caption={`Comparativa de núcleos del ${product.name}`} />
+          </div>
         </div>
       </section>
 
       {Object.keys(fundas).length > 0 && (
         <section className="section flush" aria-labelledby="fundas-title">
           <div className="wrap">
-            <div className="section-head">
+            <div className="section-head" data-reveal>
               <div>
                 <span className="eyebrow">Materiales</span>
                 <h2 id="fundas-title">Dos fundas, las dos lavables</h2>
               </div>
             </div>
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-2" data-reveal="stagger">
               {Object.entries(fundas).map(([name, info]) => (
-                <article key={name} className="card p-6">
+                <article key={name} className="card lift p-6">
                   <h3 className="mb-2 text-xl font-semibold">{name}</h3>
                   <p className="text-muted">{String(info.descripcion ?? "")}</p>
                 </article>
@@ -147,7 +149,7 @@ export default async function ProductPage({ params }: Params) {
 
       <section className="section flush" aria-labelledby="envio-title">
         <div className="wrap">
-          <div className="grid gap-8 rounded-[21px] bg-tint p-6 md:grid-cols-[1fr_1.2fr] md:p-10">
+          <div className="grid gap-8 rounded-[21px] bg-tint p-6 md:grid-cols-[1fr_1.2fr] md:p-10" data-reveal>
             <div>
               <span className="eyebrow">Envío y devoluciones</span>
               <h2 id="envio-title" className="mt-2 mb-3 text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold">
@@ -188,13 +190,13 @@ export default async function ProductPage({ params }: Params) {
       {others.length > 0 && (
         <section className="section flush" aria-labelledby="recomendados-title">
           <div className="wrap">
-            <div className="section-head">
+            <div className="section-head" data-reveal>
               <div>
                 <span className="eyebrow">También te puede gustar</span>
                 <h2 id="recomendados-title">Compara con nuestro otro colchón</h2>
               </div>
             </div>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2" data-reveal="stagger">
               {others.map((p) => (
                 <ProductCard key={p.slug} product={p} />
               ))}
