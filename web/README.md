@@ -15,7 +15,7 @@ que habla con el agente Python de [`agent/`](../agent/README.md).
 - **Carrito** persistido en el navegador, con contador en la cabecera.
 - **Cuenta**: registro e inicio de sesión con correo y contraseña o con Google (Firebase Auth).
 - **Pago**: `/api/checkout` recalcula los precios en el servidor y crea una Stripe Checkout Session. El pedido
-  se crea **solo** desde el webhook firmado de Stripe y se envía un email de confirmación con Resend.
+  se crea **solo** desde el webhook firmado de Stripe y se envía un email de confirmación por Gmail (SMTP).
 - **Mis pedidos**: listado y detalle con línea de estados, transportista y seguimiento, leídos directamente de
   Firestore con el SDK de cliente, protegidos por las reglas de seguridad.
 - **Asistente**: panel flotante con streaming SSE, indicador de consulta de herramientas y render seguro.
@@ -32,7 +32,7 @@ que habla con el agente Python de [`agent/`](../agent/README.md).
 | Firebase JS SDK | 11 | Auth en el cliente y lectura de pedidos |
 | firebase-admin | 13 | Verificación de ID tokens, escritura de pedidos y perfiles, lectura del catálogo |
 | stripe (Node) | 18 (API `2025-08-27.basil`) | Checkout Sessions y verificación del webhook |
-| Resend + React Email | 6 / 0.5 | Email de confirmación |
+| Nodemailer (Gmail SMTP) + React Email | 10.0.11 / 0.5 | Email de confirmación |
 | react-markdown + remark-gfm | 10 / 4 | Política de envíos y respuestas del asistente, sin HTML crudo |
 | Vitest + Testing Library | 3.2 / 16 | Tests unitarios, de API y de componentes |
 
@@ -76,7 +76,7 @@ web/
 │   ├── motion/      # Hooks de movimiento: tween numérico, foco atrapado, prefers-reduced-motion
 │   ├── ui/toast.ts  # Cola de toasts (Zustand)
 │   ├── chat/client.ts   # ÚNICO módulo que conoce el contrato SSE del agente
-│   ├── email/       # Interfaz EmailSender + implementación Resend
+│   ├── email/       # Interfaz EmailSender + implementación Gmail (SMTP)
 │   ├── firebase/    # admin.ts (server-only) y client.ts (navegador)
 │   ├── orders/      # fulfill.ts (creación del pedido), tipos y lectura en cliente
 │   ├── checkout.ts  # Recalcula precios y construye los parámetros de Stripe
@@ -165,7 +165,7 @@ sequenceDiagram
     participant W as Next.js (/api)
     participant S as Stripe
     participant F as Firestore
-    participant R as Resend
+    participant R as Gmail
 
     U->>W: POST /api/checkout {items:[{sku,quantity}]} + Bearer ID token
     W->>W: verifyIdToken → uid · Zod .strict()
@@ -352,7 +352,7 @@ Web Animations API.
   - `form-action 'self' https://checkout.stripe.com`. La redirección a Stripe es navegación de nivel
     superior (`window.location`), que la CSP no restringe.
 - **Secretos**: solo en variables de servidor; los módulos que los leen importan `server-only`
-  (`lib/firebase/admin.ts`, `lib/stripe.ts`, `lib/email/resend.ts`, `lib/catalog/repository.ts`,
+  (`lib/firebase/admin.ts`, `lib/stripe.ts`, `lib/email/gmail.ts`, `lib/catalog/repository.ts`,
   `lib/content.ts`) o son route handlers. Un test recorre el código y falla si un componente cliente lee una
   variable sin `NEXT_PUBLIC_` o si una `NEXT_PUBLIC_` tiene nombre de secreto.
 - **`NEXT_PUBLIC_` es la frontera**: solo la configuración web de Firebase, la clave publicable de Stripe y
@@ -378,8 +378,9 @@ navegar y las funciones que dependen de ellas muestran un aviso controlado.
 | `FIREBASE_ADMIN_CREDENTIALS` | **Secreta** | Pago, webhook, `/api/users/me`, catálogo en Firestore | JSON de cuenta de servicio en base64 (o JSON plano) |
 | `STRIPE_SECRET_KEY` | **Secreta** | Pago, webhook | `sk_test_…` (o *restricted key* con Checkout Sessions) |
 | `STRIPE_WEBHOOK_SECRET` | **Secreta** | Webhook | `whsec_…` del endpoint o de `stripe listen` |
-| `RESEND_API_KEY` | **Secreta** | Email | Sin ella el email solo se registra en logs |
-| `EMAIL_FROM` | Secreta (config) | Email | Remitente, p. ej. `Contoso <onboarding@resend.dev>` |
+| `GMAIL_USER` | Config | Email | Cuenta de Gmail remitente. Sin ella el email solo se registra en logs |
+| `GMAIL_APP_PASSWORD` | **Secreta** | Email | Contraseña de aplicación de esa cuenta (requiere verificación en dos pasos) |
+| `EMAIL_FROM_NAME` | Config | Email | Nombre visible del remitente. Por defecto `Colchones Contoso` |
 
 ## Ejecutar en local
 
@@ -422,7 +423,7 @@ Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.
 3. Inicia sesión, añade un colchón, pulsa **Pagar con tarjeta** y usa `4242 4242 4242 4242`, cualquier fecha
    futura, cualquier CVC y una dirección española.
 4. Vuelves a `/checkout/exito`, que muestra "Procesando tu pedido…" hasta que el webhook lo crea, y luego el
-   número `CP-000xxx`. El pedido aparece en "Mis pedidos" y llega el email (ver limitación de Resend).
+   número `CP-000xxx`. El pedido aparece en "Mis pedidos" y llega el email al correo de la cuenta que compra (los usuarios demo tienen correos ficticios: para verlo, compra con una cuenta real o con Google).
 5. Reenviar el mismo evento (`stripe events resend evt_…`) no duplica el pedido.
 
 ## Despliegue en Vercel
@@ -431,7 +432,7 @@ Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.
    activada la opción de incluir archivos fuera del Root Directory: el build importa `../data/*`.
 2. **Región de funciones**: `fra1` (Fráncfort) o `cdg1` (París) en *Settings → Functions*.
 3. **Variables**: todas las de la tabla, en *Production* (y *Preview* si se usa). Marcar como *Sensitive*
-   `FIREBASE_ADMIN_CREDENTIALS`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y `RESEND_API_KEY`.
+   `FIREBASE_ADMIN_CREDENTIALS`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y `GMAIL_APP_PASSWORD`.
    `NEXT_PUBLIC_SITE_URL=https://<app>.vercel.app`. Las `NEXT_PUBLIC_*` se incrustan en el build: tras
    cambiarlas hay que redeplegar.
 4. **Webhook de Stripe** (modo test): *Developers → Webhooks → Add endpoint*
@@ -449,7 +450,7 @@ npm run test:coverage    # informe en coverage/
 ```
 
 firebase-admin, Stripe (excepto la verificación de firma, que usa la librería real con un secreto de prueba),
-Resend y `fetch` están simulados; Firestore se sustituye por un doble en memoria con transacciones
+Nodemailer y `fetch` están simulados; Firestore se sustituye por un doble en memoria con transacciones
 serializadas (`tests/helpers/fakeFirestore.ts`).
 
 | Grupo | Fichero | Qué cubre |
@@ -462,7 +463,7 @@ serializadas (`tests/helpers/fakeFirestore.ts`).
 | Cliente SSE | `tests/unit/chat-client.test.ts` | Los 5 eventos (incluido `replace`); eventos troceados byte a byte; CRLF; JSON roto; `Authorization` solo con sesión; últimos 20 mensajes; 400/401/422/429 (`Retry-After`)/500/503, red y sin configurar |
 | Render del chat | `tests/components/chat-markdown.test.tsx`, `chat-widget.test.tsx` | `<script>` y `<img onerror>` no llegan al DOM; `javascript:` neutralizado; markdown normal; widget: tokens en vivo, `replace` sustituye el texto, 401 ofrece login, 429 y `error` muestran el mensaje, contador de 1000 caracteres, HTML del usuario como texto |
 | Cabeceras y entorno | `tests/security/headers-and-env.test.ts` | `next.config` expone CSP, X-Frame-Options, X-Content-Type-Options y Referrer-Policy; orígenes de Firebase/Google/agente en la CSP; `'unsafe-eval'` solo en dev; `.env.example` sin valores; ninguna `NEXT_PUBLIC_` con nombre de secreto (en `.env.example` y en el código); secretos solo en módulos `server-only`/route handlers; clientes solo leen `NEXT_PUBLIC_`; sin `dangerouslySetInnerHTML` |
-| Varios | `tests/unit/misc.test.ts` | Mensajes de error de Auth en español; `next` seguro (sin redirecciones abiertas); formato de precios/fechas; `verifyBearer` (cabeceras mal formadas, token rechazado); `EmailSender` (log sin clave, Resend con destinatario correcto y propagación de errores) |
+| Varios | `tests/unit/misc.test.ts` | Mensajes de error de Auth en español; `next` seguro (sin redirecciones abiertas); formato de precios/fechas; `verifyBearer` (cabeceras mal formadas, token rechazado); `EmailSender` (log sin credenciales, Gmail por SMTP seguro con destinatario y remitente correctos, propagación de errores y pedido sin email) |
 
 Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README.md`](../firebase/README.md).
 
@@ -479,12 +480,12 @@ Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README
 | Webhook 400 "invalid signature" | Secreto de otro endpoint o de otra sesión de `stripe listen` |
 | "Mis pedidos" da error y la consola menciona un índice | Falta el índice `orders (userId ASC, createdAt DESC)`: `firebase deploy --only firestore:indexes` |
 | El asistente: "No hemos podido conectar" | `NEXT_PUBLIC_AGENT_URL` incorrecta, agente caído o el origen no está en `ALLOWED_ORIGINS` (CORS) |
-| No llega el email | Resend sin dominio verificado solo envía al email del dueño de la cuenta; ver logs `[email]`/`[webhook]` |
+| No llega el email | Falta `GMAIL_USER`/`GMAIL_APP_PASSWORD`, la contraseña de aplicación es inválida o el comprador usa un correo ficticio (usuarios demo); ver logs `[email]`/`[webhook]` y la carpeta de spam |
 
 ## Limitaciones
 
-- **Resend sin dominio verificado** solo entrega al email del dueño de la cuenta de Resend (remitente
-  `onboarding@resend.dev`). Para enviar a cualquier cliente hay que verificar un dominio propio.
+- **Email por Gmail**: el remitente es una cuenta personal de Gmail (límite de unos 500 envíos al día) y puede
+  acabar en spam. En producción real se usaría un proveedor transaccional con dominio propio (SPF/DKIM).
 - La tarifa de envío la elige el cliente en Stripe Checkout; no se valida contra el código postal
   (Baleares/Canarias). Mejora: crear la sesión en dos pasos o validar en el webhook.
 - CSP con `'unsafe-inline'` en scripts (limitación de Next.js sin nonces).

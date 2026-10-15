@@ -16,7 +16,7 @@ vi.mock("@/lib/stripe", () => ({
   isStripeConfigured: () => true,
   getStripe: () => ({ webhooks: stripe.webhooks, checkout: { sessions: { listLineItems } } }),
 }));
-vi.mock("@/lib/email/resend", () => ({
+vi.mock("@/lib/email/gmail", () => ({
   getEmailSender: () => ({ sendOrderConfirmation }),
 }));
 
@@ -174,7 +174,7 @@ describe("POST /api/webhooks/stripe", () => {
   });
 
   it("si falla el email, el pedido se guarda igualmente", async () => {
-    sendOrderConfirmation.mockRejectedValueOnce(new Error("Resend caído"));
+    sendOrderConfirmation.mockRejectedValueOnce(new Error("Gmail caído"));
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await POST(signedRequest(event(session())));
     expect(res.status).toBe(200);
