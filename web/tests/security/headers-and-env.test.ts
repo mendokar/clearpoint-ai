@@ -59,8 +59,8 @@ describe("cabeceras de seguridad (next.config)", () => {
 });
 
 // ── Frontera NEXT_PUBLIC_ ───────────────────────────────────────────────────────
-const SECRET_HINTS = /SECRET|PRIVATE|PASSWORD|WEBHOOK|ADMIN|CREDENTIAL|SERVICE_ACCOUNT|RESEND|TOKEN|SK_|ANTHROPIC|OPENAI/;
-const SERVER_SECRETS = ["FIREBASE_ADMIN_CREDENTIALS", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RESEND_API_KEY"];
+const SECRET_HINTS = /SECRET|PRIVATE|PASSWORD|WEBHOOK|ADMIN|CREDENTIAL|SERVICE_ACCOUNT|GMAIL|TOKEN|SK_|ANTHROPIC|OPENAI/;
+const SERVER_SECRETS = ["FIREBASE_ADMIN_CREDENTIALS", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "GMAIL_APP_PASSWORD"];
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

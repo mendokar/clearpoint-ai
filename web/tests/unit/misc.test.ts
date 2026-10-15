@@ -70,30 +70,51 @@ describe("firebase-admin: verifyBearer", () => {
 describe("EmailSender", () => {
   beforeEach(() => vi.resetModules());
 
-  it("sin RESEND_API_KEY usa el sender que solo registra", async () => {
-    const { getEmailSender } = await import("@/lib/email/resend");
+  it("sin credenciales de Gmail usa el sender que solo registra", async () => {
+    const { getEmailSender } = await import("@/lib/email/gmail");
     const { LogEmailSender } = await import("@/lib/email/sender");
     expect(getEmailSender("http://localhost:3000")).toBeInstanceOf(LogEmailSender);
   });
 
-  it("con Resend envía al email del pedido y propaga errores", async () => {
-    const send = vi.fn().mockResolvedValueOnce({ data: { id: "1" }, error: null }).mockResolvedValueOnce({ data: null, error: { name: "validation_error", message: "dominio" } });
-    vi.doMock("resend", () => ({ Resend: vi.fn(() => ({ emails: { send } })) }));
-    vi.stubEnv("RESEND_API_KEY", "re_test_fake");
-    vi.stubEnv("EMAIL_FROM", "Contoso <onboarding@resend.dev>");
-    const { getEmailSender } = await import("@/lib/email/resend");
+  it("con Gmail envía por SMTP seguro al email del pedido y propaga errores", async () => {
+    const sendMail = vi.fn().mockResolvedValueOnce({ messageId: "1" }).mockRejectedValueOnce(new Error("Gmail: auth failed"));
+    const createTransport = vi.fn(() => ({ sendMail }));
+    vi.doMock("nodemailer", () => ({ default: { createTransport } }));
+    vi.stubEnv("GMAIL_USER", "contoso.tienda@gmail.com");
+    vi.stubEnv("GMAIL_APP_PASSWORD", "abcd efgh ijkl mnop");
+    const { getEmailSender, GmailEmailSender } = await import("@/lib/email/gmail");
     const sender = getEmailSender("https://tienda.test");
+    expect(sender).toBeInstanceOf(GmailEmailSender);
+    expect(createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: "contoso.tienda@gmail.com", pass: "abcdefghijklmnop" } }),
+    );
     const order = {
       id: "cs_test_1",
       orderNumber: "CP-000124",
       email: "ana@example.com",
       items: [],
+      subtotal: 1,
       total: 1,
       shipping: 0,
+      currency: "EUR",
       shippingAddress: null,
     } as unknown as Parameters<typeof sender.sendOrderConfirmation>[0];
     await sender.sendOrderConfirmation(order);
-    expect(send.mock.calls[0][0]).toMatchObject({ to: "ana@example.com", subject: expect.stringContaining("CP-000124") });
-    await expect(sender.sendOrderConfirmation(order)).rejects.toThrow(/Resend/);
+    const mail = sendMail.mock.calls[0][0];
+    expect(mail).toMatchObject({
+      to: "ana@example.com",
+      from: { name: "Colchones Contoso", address: "contoso.tienda@gmail.com" },
+      subject: expect.stringContaining("CP-000124"),
+    });
+    expect(mail.html).toContain("CP-000124");
+    expect(mail.text).toContain("CP-000124");
+    await expect(sender.sendOrderConfirmation(order)).rejects.toThrow(/Gmail/);
+  });
+
+  it("rechaza un pedido sin email", async () => {
+    vi.doMock("nodemailer", () => ({ default: { createTransport: () => ({ sendMail: vi.fn() }) } }));
+    const { GmailEmailSender } = await import("@/lib/email/gmail");
+    const sender = new GmailEmailSender("a@gmail.com", "x", "Contoso", "https://t.test");
+    await expect(sender.sendOrderConfirmation({ id: "x", orderNumber: "CP-000001" } as never)).rejects.toThrow(/email/);
   });
 });
