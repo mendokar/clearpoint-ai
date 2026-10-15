@@ -44,12 +44,14 @@ Contoso es una tienda online de colchones de adulto con identidad colombiana: ta
 |---|---|---|
 | Diseño visual de la home | — | ✅ Aprobado |
 | Datos compartidos (catálogo, política, pedidos demo) | [`data/`](data/README.md) | ✅ Hecho |
-| Asistente IA (FastAPI + LangGraph) | [`agent/`](agent/README.md) | ✅ Hecho en local: 133 tests y 94 % de cobertura. Falta probarlo con la API real y desplegarlo |
+| Asistente IA (FastAPI + LangGraph) | [`agent/`](agent/README.md) | ✅ Desplegado en Cloud Run y probado con Anthropic y con el respaldo de OpenAI |
 | Web (Next.js): interfaz, carrito, auth, checkout, webhook | [`web/`](web/README.md) | ✅ Hecho en local: build, lint y typecheck limpios. Falta la prueba de extremo a extremo con credenciales |
 | Reglas e índices de Firestore | [`firebase/`](firebase/README.md) | ✅ Hecho y probado en el emulador. Falta desplegarlas |
 | Scripts de seed y de estados de pedido | [`scripts/`](scripts/README.md) | ✅ Probados contra los emuladores |
 | Pruebas unitarias y de seguridad | `agent/tests`, `web/tests`, `firebase/tests` | ✅ 241 pruebas en verde |
-| Proyecto Firebase, Stripe, email y despliegues | — | ⏳ Pendiente de credenciales |
+| Proyecto Firebase con reglas, índices y datos de demo | `firebase/`, `scripts/` | ✅ Activo y verificado |
+| Stripe en modo test | `web/` | ✅ Checkout probado en local y webhook de producción creado |
+| Email y despliegues | — | ⏳ Pendiente |
 | Memoria técnica | `docs/` | ⏳ Pendiente |
 
 ---
@@ -156,26 +158,78 @@ Regla de oro: solo las variables con prefijo `NEXT_PUBLIC_` llegan al navegador,
 
 ## Datos y accesos de demostración
 
-Se completará cuando el proyecto de Firebase esté creado y cargado con el seed.
+Los datos se cargan con `scripts/seed.ts` desde la carpeta [`data/`](data/README.md). El seed es idempotente: se puede ejecutar varias veces sin duplicar nada.
 
 | Usuario | Contraseña | Pedidos |
 |---|---|---|
-| `demo1@…` | _pendiente_ | 3 pedidos: pagado, enviado con seguimiento y entregado |
-| `demo2@…` | _pendiente_ | 1 pedido |
+| `demo1@contoso.example` | `Tolima-Siesta-4732` | 3 pedidos: CP-000101 entregado, CP-000118 enviado con seguimiento y CP-000123 pagado |
+| `demo2@contoso.example` | `Caribe-Panela-1348` | 1 pedido: CP-000120 en preparación, a medida y con envío a Baleares |
 
-**Pago de prueba:** tarjeta `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC.
+También se puede crear una cuenta nueva con correo y contraseña o entrar con Google.
+
+**Pago de prueba:** tarjeta `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC. La tarjeta `4000 0000 0000 0002` simula un pago rechazado.
+
+**Probar que el asistente ve datos actualizados:** cambia el estado de un pedido y pregunta de nuevo al asistente.
+
+```bash
+cd scripts && npx tsx --env-file=.env update-order-status.ts CP-000123 shipped
+```
 
 ---
 
 ## Despliegue
 
-| Pieza | Plataforma | Región |
-|---|---|---|
-| Web | Vercel (Root Directory `web`) | Europa (`fra1` o `cdg1`) |
-| Asistente | Google Cloud Run | `europe-southwest1` (Madrid) |
-| Base de datos y auth | Firebase (plan Blaze) | Europa |
+| Pieza | Plataforma | Región | Estado |
+|---|---|---|---|
+| Web | Vercel (Root Directory `web`), dominio `clearpoint-ai.vercel.app` | Europa (`fra1`) | ⏳ Falta llevar el código a master y cargar las variables |
+| Asistente | Google Cloud Run, servicio `agent` en `https://agent-305860844301.europe-southwest1.run.app` | `europe-southwest1` (Madrid) | ✅ Activo |
+| Auth y Firestore | Firebase, proyecto `clearpoint-colchones` | — | ✅ Activo |
+| Pagos | Stripe en modo test. Webhook `checkout.session.completed` hacia `https://clearpoint-ai.vercel.app/api/webhooks/stripe` | — | ✅ Creado |
 
-URL pública: _pendiente_.
+### Firebase
+
+| Elemento | Estado |
+|---|---|
+| Proyecto | `clearpoint-colchones` |
+| Authentication | Correo y contraseña y Google activados. Dominios autorizados: `localhost`, los de Firebase y `clearpoint-ai.vercel.app` |
+| Firestore | Base de datos `(default)` en modo nativo |
+| Reglas e índices | Desplegados desde `firebase/` |
+| Datos de demo | Cargados con el seed |
+
+La configuración web de Firebase es pública por diseño y se rellena en `web/.env.local`. La credencial de administrador es secreta: se guarda en base64 en `FIREBASE_ADMIN_CREDENTIALS`, nunca en el repositorio.
+
+Reglas verificadas contra el proyecto real con el usuario demo1:
+
+| Prueba | Resultado |
+|---|---|
+| Leer sus propios pedidos | Permitido, 3 pedidos |
+| Leer los pedidos de demo2 | Denegado |
+| Listar todos los pedidos | Denegado |
+| Leer un producto sin sesión | Permitido |
+
+### Asistente en Cloud Run
+
+| Elemento | Valor |
+|---|---|
+| Cuenta de servicio en ejecución | `agent-sa`, con `roles/datastore.viewer` y acceso solo a sus dos secretos |
+| Cuenta de servicio de compilación | `agent-builder`, con `roles/run.builder` |
+| Secretos | `anthropic-key` y `openai-key` en Secret Manager |
+| Modelos | `claude-sonnet-5-5` principal y `gpt-5.4-mini` de respaldo |
+| Instancias | Mínimo 1 y máximo 3 |
+| Orígenes permitidos | `https://clearpoint-ai.vercel.app` y `http://localhost:3000` |
+
+Pruebas contra el servicio desplegado, del 15/10/2026:
+
+| Prueba | Resultado |
+|---|---|
+| Pregunta de producto sin sesión | Responde con Anthropic consultando el catálogo |
+| "Lista mis pedidos" con demo1 | Devuelve solo sus 3 pedidos con el estado actual |
+| Token falso | 401 |
+| Petición desde un origen no permitido | CORS rechazado |
+| Pedido de demo2 pedido por demo1 con prompt injection, en local | "No encontrado" |
+| Anthropic forzado a fallar, en local | Responde OpenAI |
+
+URL pública: https://clearpoint-ai.vercel.app (pendiente de primer despliegue con la web).
 
 ---
 
@@ -221,27 +275,3 @@ Se irán ampliando. Las actuales son estas:
 Fotografías de [Unsplash](https://unsplash.com) bajo la licencia de Unsplash: Matthieu Lemarchal, Deconovo, Nathan Van Egmond, Costa Live y Roberto Nickson.
 
 Proyecto desarrollado con ayuda de herramientas de IA. Su uso se detalla en la memoria técnica.
-
-
-
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCD0APOSR5c43v3uWejMvOrHMR4mYZ6SLg",
-  authDomain: "clearpoint-colchones.firebaseapp.com",
-  projectId: "clearpoint-colchones",
-  storageBucket: "clearpoint-colchones.firebasestorage.app",
-  messagingSenderId: "305860844301",
-  appId: "1:305860844301:web:39c1b4201661eeeb15ae44",
-  measurementId: "G-CW2GC6DB5L"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
