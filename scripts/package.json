@@ -1,0 +1,19 @@
+{
+  "name": "contoso-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "tsx --env-file=.env seed.ts",
+    "order:status": "tsx --env-file=.env update-order-status.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase-admin": "13.5.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.9",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
+  }
+}
