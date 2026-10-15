@@ -7,6 +7,7 @@
  */
 import { auth, fail, initAdmin } from "./lib/admin";
 import { parseArgs, setAdmin, SetAdminError } from "./lib/set-admin";
+import { parseAdminEmails } from "../web/lib/admin/allowlist";
 
 async function main() {
   let args;
@@ -16,7 +17,7 @@ async function main() {
     fail(err instanceof Error ? err.message : String(err));
   }
   initAdmin();
-  const result = await setAdmin(auth(), args.email, args.revoke);
+  const result = await setAdmin(auth(), args.email, args.revoke, parseAdminEmails(process.env.ADMIN_EMAILS));
   const messages = {
     granted: `✓ ${args.email} (${result.uid}) ahora es administrador. Que recargue /admin para refrescar su token.`,
     revoked: `✓ ${args.email} (${result.uid}) ya no es administrador; sus sesiones se han revocado.`,

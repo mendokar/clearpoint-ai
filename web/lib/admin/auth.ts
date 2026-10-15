@@ -3,12 +3,14 @@ import { NextResponse } from "next/server";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { isAdminConfigured, verifyBearer } from "../firebase/admin";
 import { AdminStoreError } from "./errors";
+import { adminDenyReason, parseAdminEmails } from "./allowlist";
 
 /**
  * Autorización de las rutas `/api/admin/**`. SIEMPRE en servidor:
  *  1. Sin Firebase Admin configurado → 503.
  *  2. Sin token, token inválido, caducado o con sesiones revocadas → 401.
- *  3. Token válido sin el custom claim `admin: true` → 403.
+ *  3. Token válido sin el custom claim `admin: true`, sin correo verificado o con un correo fuera de
+ *     `ADMIN_EMAILS` (por defecto admin@contoso.example) → 403.
  * El claim solo lo puede poner el Admin SDK (`scripts/set-admin.ts`); el cliente no puede falsificarlo
  * porque el token va firmado por Google y se verifica aquí.
  */
@@ -24,8 +26,12 @@ export function errorResponse(status: number, message: string, extra: Record<str
   return jsonResponse(status, { error: message, ...extra });
 }
 
+export function adminEmails(): string[] {
+  return parseAdminEmails(process.env.ADMIN_EMAILS);
+}
+
 export function isAdminToken(user: DecodedIdToken | null | undefined): boolean {
-  return (user as (DecodedIdToken & { admin?: unknown }) | null | undefined)?.admin === true;
+  return adminDenyReason(user, adminEmails()) === null;
 }
 
 export async function requireAdmin(req: Request): Promise<AdminCheck> {
@@ -34,8 +40,9 @@ export async function requireAdmin(req: Request): Promise<AdminCheck> {
   }
   const user = await verifyBearer(req.headers.get("authorization"), { checkRevoked: true });
   if (!user) return { ok: false, response: errorResponse(401, "Inicia sesión para continuar.") };
-  if (!isAdminToken(user)) {
-    console.warn("[admin] acceso denegado sin rol admin", { uid: user.uid });
+  const reason = adminDenyReason(user, adminEmails());
+  if (reason) {
+    console.warn("[admin] acceso denegado", { uid: user.uid, reason });
     return { ok: false, response: errorResponse(403, "No tienes permisos de administración.") };
   }
   return { ok: true, user };

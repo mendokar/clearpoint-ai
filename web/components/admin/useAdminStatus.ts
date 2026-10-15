@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getClientAuth } from "@/lib/firebase/client";
+import { DEFAULT_ADMIN_EMAILS, isAllowedAdmin, type AdminClaims } from "@/lib/admin/allowlist";
 
 export type AdminStatus = "unconfigured" | "loading" | "anonymous" | "denied" | "admin";
 
 /**
- * ¿El usuario actual tiene el custom claim `admin: true`? Solo sirve para la UI (mostrar el panel o el
+ * ¿El usuario actual es administrador (claim `admin: true`, correo verificado y en la lista permitida)? Solo sirve para la UI (mostrar el panel o el
  * enlace); el servidor vuelve a comprobarlo en cada petición.
  * Con `forceRefresh` pide un ID token nuevo (`getIdTokenResult(true)`), necesario para ver un rol recién
  * asignado con `scripts/set-admin.ts` sin cerrar sesión.
@@ -21,7 +22,7 @@ export function useAdminStatus({ forceRefresh = false }: { forceRefresh?: boolea
     if (!current) return;
     try {
       const result = await current.getIdTokenResult(force);
-      setClaim({ uid: current.uid, admin: result.claims.admin === true });
+      setClaim({ uid: current.uid, admin: isAllowedAdmin(result.claims as AdminClaims, DEFAULT_ADMIN_EMAILS) });
     } catch {
       setClaim({ uid: current.uid, admin: false });
     }

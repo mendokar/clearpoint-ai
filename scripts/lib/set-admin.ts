@@ -26,7 +26,19 @@ export function parseArgs(argv: string[]): { email: string; revoke: boolean } {
   return { email: rest[0].trim().toLowerCase(), revoke };
 }
 
-export async function setAdmin(auth: AdminAuthLike, email: string, revoke: boolean): Promise<SetAdminResult> {
+export async function setAdmin(
+  auth: AdminAuthLike,
+  email: string,
+  revoke: boolean,
+  allowed: readonly string[] = ["admin@contoso.example"],
+): Promise<SetAdminResult> {
+  // Quitar el rol siempre está permitido; concederlo solo a correos de la lista (ADMIN_EMAILS).
+  if (!revoke && !allowed.includes(email.trim().toLowerCase())) {
+    throw new SetAdminError(
+      `${email} no está en la lista de administradores permitidos (${allowed.join(", ")}). ` +
+        "Añádelo a ADMIN_EMAILS en scripts/.env y en Vercel si de verdad debe administrar la tienda.",
+    );
+  }
   let user;
   try {
     user = await auth.getUserByEmail(email);

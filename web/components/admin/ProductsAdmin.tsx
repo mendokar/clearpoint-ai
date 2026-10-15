@@ -54,10 +54,16 @@ export function ProductsAdmin({ created }: { created?: string }) {
     setMessage(null);
     setError(null);
     try {
-      await adminFetch(`/api/admin/products/${encodeURIComponent(slug)}`, { method: "DELETE" });
+      const res = await adminFetch<{ images?: "deleted" | "failed" }>(`/api/admin/products/${encodeURIComponent(slug)}`, {
+        method: "DELETE",
+      });
       setData((d) => d && { ...d, products: d.products.filter((x) => x.slug !== slug), invalid: d.invalid.filter((x) => x.slug !== slug) });
       setConfirming(null);
-      setMessage(`${name} eliminado.`);
+      setMessage(
+        res?.images === "failed"
+          ? `${name} eliminado. No se han podido borrar sus fotos de Storage (quedan en products/${slug}/).`
+          : `${name} eliminado.`,
+      );
     } catch (err) {
       setError(errorMessage(err));
     } finally {

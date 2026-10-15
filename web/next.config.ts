@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 import { securityHeaders } from "./security-headers.mjs";
-import { ALLOWED_IMAGE_HOSTS } from "./lib/catalog/image-hosts";
+import { remoteImagePatterns } from "./lib/catalog/image-hosts";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -10,8 +10,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   serverExternalPackages: ["firebase-admin"],
   // Imágenes https que se pueden asignar a un producto desde el panel (pasan por /_next/image).
+  // De Firebase Storage solo las del bucket configurado.
   images: {
-    remotePatterns: ALLOWED_IMAGE_HOSTS.map((hostname) => ({ protocol: "https" as const, hostname, pathname: "/**" })),
+    remotePatterns: remoteImagePatterns(),
   },
   async headers() {
     return [

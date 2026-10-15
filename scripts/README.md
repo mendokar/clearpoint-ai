@@ -154,7 +154,8 @@ npx firebase emulators:exec --only firestore,auth --project demo-contoso \
 
 Así se verificaron los scripts (incluida una segunda ejecución del seed y de `set-admin` para comprobar la
 idempotencia). No uses `--env-file=.env` con los emuladores: `.env` tiene las credenciales del proyecto real.
-Si el puerto 8080 está ocupado, usa una copia de `firebase.json` con otros puertos (`--config`).
+`firebase.json` usa Firestore en el 8181, Auth en el 9099 y Storage en el 9199 (el 8080 lo usa el asistente en
+local). Si alguno está ocupado, usa una copia de `firebase.json` con otros puertos (`--config`).
 
 ## Tests
 
