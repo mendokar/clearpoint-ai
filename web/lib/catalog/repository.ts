@@ -17,6 +17,27 @@ export interface CatalogRepository {
 
 const localProducts: Product[] = catalogSchema.parse(rawCatalog).products;
 
+/**
+ * Convierte un documento de Firestore en datos planos serializables: los `Timestamp` (cualquier objeto con
+ * `toDate()`) pasan a ISO 8601. Next.js solo puede pasar objetos planos a componentes de cliente, y el
+ * esquema de producto conserva los campos extra (`updatedAt` del seed).
+ */
+export function toPlain(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value;
+  const maybeTs = value as { toDate?: unknown };
+  if (typeof maybeTs.toDate === "function") {
+    const date = (maybeTs.toDate as () => Date).call(value);
+    return date instanceof Date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+  }
+  if (Array.isArray(value)) return value.map(toPlain);
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toPlain(v)]));
+}
+
+/** Valida un producto leído de Firestore ya convertido a datos planos. */
+export function parseFirestoreProduct(data: unknown) {
+  return catalogSchema.shape.products.element.safeParse(toPlain(data));
+}
+
 class LocalCatalogRepository implements CatalogRepository {
   async listProducts() {
     return localProducts.filter((p) => p.active);
@@ -37,7 +58,7 @@ class FirestoreCatalogRepository implements CatalogRepository {
       const snap = await getAdminDb().collection("products").where("active", "==", true).get();
       const products: Product[] = [];
       for (const doc of snap.docs) {
-        const parsed = catalogSchema.shape.products.element.safeParse(doc.data());
+        const parsed = parseFirestoreProduct(doc.data());
         if (parsed.success) products.push(parsed.data);
         else console.error("[catalog] producto inválido en Firestore", { id: doc.id });
       }
@@ -53,7 +74,7 @@ class FirestoreCatalogRepository implements CatalogRepository {
     try {
       const doc = await getAdminDb().collection("products").doc(slug).get();
       if (!doc.exists) return null;
-      const parsed = catalogSchema.shape.products.element.safeParse(doc.data());
+      const parsed = parseFirestoreProduct(doc.data());
       return parsed.success && parsed.data.active ? parsed.data : null;
     } catch (err) {
       console.error("[catalog] Firestore no disponible, se usa el catálogo local", errMsg(err));
