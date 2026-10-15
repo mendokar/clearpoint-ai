@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCatalog } from "@/lib/catalog/repository";
+import { CatalogUnavailableError, getCatalog } from "@/lib/catalog/repository";
 import { buildSessionParams, CheckoutError, priceCart } from "@/lib/checkout";
 import { isAdminConfigured, verifyBearer } from "@/lib/firebase/admin";
 import { siteUrlFrom } from "@/lib/site";
@@ -39,6 +39,9 @@ export async function POST(req: Request) {
     return json(200, { url: session.url });
   } catch (err) {
     if (err instanceof CheckoutError) return json(err.status, { error: err.message });
+    if (err instanceof CatalogUnavailableError) {
+      return json(503, { error: "El pago no está disponible ahora mismo. Inténtalo más tarde." });
+    }
     console.error("[checkout] error creando la sesión", { error: err instanceof Error ? err.message : String(err) });
     return json(502, { error: "No hemos podido iniciar el pago. Inténtalo de nuevo." });
   }

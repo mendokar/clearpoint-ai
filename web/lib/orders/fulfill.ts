@@ -11,7 +11,7 @@ export type FulfillDeps = {
 };
 
 export type FulfillResult =
-  | { status: "created"; orderId: string; orderNumber: string; emailSent: boolean }
+  | { status: "created"; orderId: string; orderNumber: string; emailSent: boolean; adminNotified: boolean }
   | { status: "duplicate"; orderId: string }
   | { status: "ignored"; reason: string };
 
@@ -123,5 +123,16 @@ export async function fulfillCheckoutSession(
       error: err instanceof Error ? err.message : String(err),
     });
   }
-  return { status: "created", orderId: session.id, orderNumber: result.orderNumber, emailSent };
+  // Aviso a la tienda: independiente del email al cliente y sin bloquear el pedido.
+  let adminNotified = false;
+  try {
+    await deps.email.sendNewOrderAlert({ ...result, id: session.id });
+    adminNotified = true;
+  } catch (err) {
+    console.error("[webhook] fallo al avisar a la tienda del pedido nuevo", {
+      orderId: session.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  return { status: "created", orderId: session.id, orderNumber: result.orderNumber, emailSent, adminNotified };
 }

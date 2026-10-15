@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Notice } from "@/components/ui/Notice";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
-import { formatDate, formatPrice } from "@/lib/format";
+import { formatDate, formatOptions, formatPrice } from "@/lib/format";
 import { fetchMyOrder, type OrderWithId } from "@/lib/orders/client";
 import { orderIdSchema, STATUS_LABELS } from "@/lib/schemas";
 import { OrderStatusBadge, STATUS_FLOW } from "./OrderStatus";
@@ -113,7 +113,7 @@ export function OrderDetail({ id }: { id: string }) {
                   <p className="font-semibold">
                     {item.name} × {item.quantity}
                   </p>
-                  <p className="text-sm text-muted">{Object.values(item.options).join(" · ")}</p>
+                  <p className="text-sm text-muted">{formatOptions(item.options)}</p>
                   <p className="mono text-xs text-muted">SKU {item.sku}</p>
                 </div>
                 <b className="tabular-nums">{formatPrice(item.unitPrice * item.quantity, order.currency)}</b>

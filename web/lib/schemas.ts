@@ -17,16 +17,8 @@ export const checkoutRequestSchema = z
 
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 
-export const ORDER_STATUSES = ["paid", "preparing", "shipped", "delivered", "cancelled"] as const;
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export { ORDER_STATUSES, STATUS_LABELS, type OrderStatus } from "./orders/status";
 
-export const STATUS_LABELS: Record<OrderStatus, string> = {
-  paid: "Pagado",
-  preparing: "En preparación",
-  shipped: "Enviado",
-  delivered: "Entregado",
-  cancelled: "Cancelado",
-};
 
 /** Formato del ID de pedido: el ID de la Checkout Session de Stripe. */
 export const orderIdSchema = z.string().regex(/^cs_[A-Za-z0-9_]{6,200}$/);

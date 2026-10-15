@@ -456,6 +456,34 @@
   table.ct td.plus {
     background: color-mix(in srgb, var(--panela) 16%, transparent);
   }
+  /* QA: en móvil la columna recomendada (Ceiba+) quedaba fuera de pantalla. La tabla se compacta
+     para que las tres columnas quepan sin desplazamiento horizontal. */
+  @media (max-width: 560px) {
+    table.ct {
+      min-width: 0;
+      table-layout: fixed;
+    }
+    table.ct th,
+    table.ct td {
+      padding: 0.7rem 0.55rem;
+      overflow-wrap: anywhere;
+    }
+    table.ct thead th {
+      font-size: 1.02rem;
+    }
+    table.ct thead th .pill {
+      display: table;
+      margin: 0.3rem 0 0;
+    }
+    table.ct tbody th {
+      font-size: 0.64rem;
+      letter-spacing: 0.03em;
+      width: 36%;
+    }
+    table.ct td {
+      font-size: 0.9rem;
+    }
+  }
 
   /* Pie */
   .site-footer {
@@ -542,6 +570,19 @@
     height: 10px;
     border-radius: 50%;
     background: var(--on-accent);
+  }
+  /* QA: en móvil el botón flotante tapaba el total del carrito, el botón "Crear cuenta" y el pie.
+     Se reserva su altura al final del contenido y del pie para poder desplazar todo por encima. */
+  @media (max-width: 860px) {
+    :root {
+      --fab-clearance: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+    main#contenido {
+      padding-bottom: var(--fab-clearance);
+    }
+    .site-footer .legal {
+      padding-bottom: var(--fab-clearance);
+    }
   }
 
   /* Contenido markdown (política, asistente) */

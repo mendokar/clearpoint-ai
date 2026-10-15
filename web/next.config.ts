@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 import { securityHeaders } from "./security-headers.mjs";
+import { ALLOWED_IMAGE_HOSTS } from "./lib/catalog/image-hosts";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -8,6 +9,10 @@ const nextConfig: NextConfig = {
   // El catálogo y la política viven en ../data (compartidos con el agente).
   outputFileTracingRoot: path.join(__dirname, ".."),
   serverExternalPackages: ["firebase-admin"],
+  // Imágenes https que se pueden asignar a un producto desde el panel (pasan por /_next/image).
+  images: {
+    remotePatterns: ALLOWED_IMAGE_HOSTS.map((hostname) => ({ protocol: "https" as const, hostname, pathname: "/**" })),
+  },
   async headers() {
     return [
       {
@@ -18,6 +23,8 @@ const nextConfig: NextConfig = {
           dev: process.env.NODE_ENV !== "production",
         }),
       },
+      // El panel no se indexa (además de robots en el metadata de app/admin/layout.tsx).
+      { source: "/admin/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
     ];
   },
   webpack(config) {

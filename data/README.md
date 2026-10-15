@@ -1,11 +1,17 @@
 # Datos de Colchones Contoso (`data/`)
 
-Fuente de verdad del catálogo, la política de envíos y los pedidos de demostración. Los mismos ficheros
-alimentan Firestore (vía el futuro `scripts/seed.ts`) y el repositorio en memoria del asistente.
+Datos **iniciales** de la tienda: semilla del catálogo, política de envíos y pedidos de demostración. Alimentan
+Firestore vía `scripts/seed.ts` y el repositorio en memoria del asistente (`REPOSITORY_BACKEND=memory`, tests).
+
+> **`catalog.json` es solo la semilla inicial.** En producción la fuente de verdad del catálogo es la colección
+> `products` de Firestore, que se gestiona desde el panel `/admin/productos`. La web solo usa este JSON en
+> desarrollo **sin credenciales** de Firebase; con credenciales nunca vuelve a él (ni con cero productos, ni si un
+> producto no existe, ni si Firestore falla). Editar este fichero no cambia la tienda desplegada salvo que se vuelva
+> a ejecutar el seed, que **sobrescribe** los productos con el mismo slug.
 
 | Fichero | Contenido | Quién lo consume |
 |---|---|---|
-| `catalog.json` | Los 2 colchones con opciones y todas sus variantes | `scripts/seed.ts` → `products/{slug}`; `agent/` (`REPOSITORY_BACKEND=memory` y tests); `web/` puede usarlo como referencia de tipos |
+| `catalog.json` | Semilla: los 2 colchones con opciones y todas sus variantes | `scripts/seed.ts` → `products/{slug}`; `agent/` (`REPOSITORY_BACKEND=memory` y tests); `web/` solo en desarrollo sin credenciales y en tests |
 | `shipping_policy.md` | Política de envíos, devoluciones, cambios y garantía (markdown) | `scripts/seed.ts` → `content/shipping_policy.body_md`; `agent/` (memoria y tests); `web/` puede renderizarla en `/envios-y-devoluciones` |
 | `demo_orders.json` | 4 pedidos de 2 usuarios demo | `scripts/seed.ts` → `orders/{id}`; tests de aislamiento de `agent/` |
 
@@ -79,7 +85,7 @@ ID del documento (el seed lo usa como ID y **no** debe guardarlo como campo):
 
 ## Cómo modificar
 
-- **Catálogo**: edita `catalog.json` manteniendo el esquema (cada variante con las tres opciones y un SKU
+- **Catálogo**: en producción, desde el panel `/admin/productos`. Para cambiar la semilla, edita `catalog.json` manteniendo el esquema (cada variante con las tres opciones y un SKU
   único; `priceFrom` igual al mínimo de `variants[].price`). Vuelve a ejecutar el seed para Firestore.
   En el agente, el repositorio en memoria lo lee al arrancar; Firestore se lee en cada consulta.
 - **Política**: edita `shipping_policy.md` (markdown sencillo, sin HTML) y vuelve a ejecutar el seed. El

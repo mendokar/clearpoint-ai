@@ -6,6 +6,7 @@ const WEBHOOK_SECRET = "whsec_test_fake_secret";
 const stripe = new Stripe("sk_test_fake_not_real", { apiVersion: "2025-08-27.basil" });
 const listLineItems = vi.fn();
 const sendOrderConfirmation = vi.fn();
+const sendNewOrderAlert = vi.fn();
 let db: FakeFirestore;
 
 vi.mock("@/lib/firebase/admin", () => ({
@@ -17,7 +18,7 @@ vi.mock("@/lib/stripe", () => ({
   getStripe: () => ({ webhooks: stripe.webhooks, checkout: { sessions: { listLineItems } } }),
 }));
 vi.mock("@/lib/email/gmail", () => ({
-  getEmailSender: () => ({ sendOrderConfirmation }),
+  getEmailSender: () => ({ sendOrderConfirmation, sendNewOrderAlert, sendOrderStatusUpdate: vi.fn() }),
 }));
 
 const { POST } = await import("@/app/api/webhooks/stripe/route");
@@ -88,6 +89,7 @@ beforeEach(() => {
     ],
   });
   sendOrderConfirmation.mockResolvedValue(undefined);
+  sendNewOrderAlert.mockResolvedValue(undefined);
 });
 
 describe("POST /api/webhooks/stripe", () => {
@@ -180,6 +182,33 @@ describe("POST /api/webhooks/stripe", () => {
     expect(res.status).toBe(200);
     expect(db.store.get("orders/cs_test_abc123")).toBeDefined();
     expect(spy).toHaveBeenCalled();
+  });
+
+  it("avisa a la tienda una sola vez con el pedido creado (número, total, artículos, dirección)", async () => {
+    await POST(signedRequest(event(session())));
+    await POST(signedRequest(event(session(), "checkout.session.completed", "evt_retry")));
+    expect(sendNewOrderAlert).toHaveBeenCalledTimes(1);
+    const alerted = sendNewOrderAlert.mock.calls[0][0];
+    expect(alerted).toMatchObject({ id: "cs_test_abc123", orderNumber: "CP-000001", total: 719 });
+    expect(alerted.items).toHaveLength(1);
+    expect(alerted.shippingAddress).toMatchObject({ city: "Madrid" });
+  });
+
+  it("si falla el aviso a la tienda, el pedido se guarda y el cliente recibe su email", async () => {
+    sendNewOrderAlert.mockRejectedValueOnce(new Error("SMTP caído"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await POST(signedRequest(event(session())));
+    expect(res.status).toBe(200);
+    expect(db.store.get("orders/cs_test_abc123")).toBeDefined();
+    expect(sendOrderConfirmation).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls.some((c) => String(c[0]).includes("avisar a la tienda"))).toBe(true);
+  });
+
+  it("si falla el email al cliente, igualmente se avisa a la tienda", async () => {
+    sendOrderConfirmation.mockRejectedValueOnce(new Error("Gmail caído"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await POST(signedRequest(event(session())));
+    expect(sendNewOrderAlert).toHaveBeenCalledTimes(1);
   });
 
   it("si falla Firestore → 500 para que Stripe reintente", async () => {

@@ -19,6 +19,10 @@ que habla con el agente Python de [`agent/`](../agent/README.md).
 - **Mis pedidos**: listado y detalle con línea de estados, transportista y seguimiento, leídos directamente de
   Firestore con el SDK de cliente, protegidos por las reglas de seguridad.
 - **Asistente**: panel flotante con streaming SSE, indicador de consulta de herramientas y render seguro.
+- **Panel de administración** (`/admin`, solo usuarios con el claim `admin`): productos (crear, editar,
+  activar/desactivar, eliminar, variantes con precio y stock) y pedidos (listado, detalle, cambio de estado con
+  email al cliente). La tienda no tiene datos de producto en el código: todo sale de Firestore. Ver
+  [Panel de administración](#panel-de-administración).
 
 ## Stack
 
@@ -55,12 +59,19 @@ web/
 │   ├── checkout/exito/page.tsx    # "Procesando…" y espera a que el webhook cree el pedido
 │   ├── checkout/cancelado/page.tsx
 │   ├── envios-y-devoluciones/page.tsx  # Renderiza data/shipping_policy.md (o Firestore)
-│   ├── not-found.tsx
+│   ├── not-found.tsx · error.tsx  # 404 y error controlado (p. ej. Firestore no responde)
+│   ├── admin/                     # Panel: layout (noindex + guarda), resumen, productos/, pedidos/
 │   └── api/
 │       ├── checkout/route.ts          # POST: crea la Checkout Session
 │       ├── webhooks/stripe/route.ts   # POST: crea el pedido (idempotente) y envía el email
-│       └── users/me/route.ts          # POST: upsert del perfil users/{uid}
+│       ├── users/me/route.ts          # POST: upsert del perfil users/{uid}
+│       ├── admin/products/…           # GET/POST y GET/PUT/PATCH/DELETE [slug] (claim admin)
+│       ├── admin/orders/…             # GET (lista) y GET/PATCH [id] (claim admin)
+│       ├── admin/summary/route.ts     # GET: cifras de la portada del panel
+│       └── catalog/images/route.ts    # GET estático (build): fotos de public/images para el selector
 ├── components/
+│   ├── admin/       # RequireAdmin, AdminNavLink, AdminNav, ProductsAdmin, ProductForm (+ productFormModel),
+│   │                # ProductEditor, OrdersAdmin, OrderAdminDetail, AdminSummary, useAdminStatus
 │   ├── auth/        # AuthProvider (contexto, Google, correo), AuthForm, RequireAuth
 │   ├── cart/        # CartView, CartDrawer (mini-carrito lateral), useCheckout
 │   ├── chat/        # ChatWidget, ChatMarkdown (render seguro), ChatContext
@@ -69,16 +80,17 @@ web/
 │   ├── orders/      # OrdersList, OrderDetail, CheckoutSuccess, OrderStatus
 │   ├── product/     # ProductConfigurator, ProductGallery, CoresTable, selection.ts (lógica pura)
 │   └── ui/          # Notice, Spinner, Skeleton, Toaster, AnimatedPrice, Icons, RevealObserver
-├── emails/OrderConfirmation.tsx   # Plantilla React Email
+├── emails/                       # React Email: OrderConfirmation, NewOrderAlert (tienda), OrderStatusUpdate
 ├── lib/
-│   ├── catalog/     # Esquema Zod del catálogo y repositorio (Firestore o data/catalog.json)
+│   ├── admin/       # auth.ts (requireAdmin), products.ts, orders.ts, errors.ts (server-only) y client.ts (navegador)
+│   ├── catalog/     # Esquemas Zod (lectura y admin-schema.ts), generador de variantes, repositorio, hosts de imagen
 │   ├── cart/        # Store de Zustand y estado del mini-carrito (drawer.ts)
 │   ├── motion/      # Hooks de movimiento: tween numérico, foco atrapado, prefers-reduced-motion
 │   ├── ui/toast.ts  # Cola de toasts (Zustand)
 │   ├── chat/client.ts   # ÚNICO módulo que conoce el contrato SSE del agente
 │   ├── email/       # Interfaz EmailSender + implementación Gmail (SMTP)
 │   ├── firebase/    # admin.ts (server-only) y client.ts (navegador)
-│   ├── orders/      # fulfill.ts (creación del pedido), tipos y lectura en cliente
+│   ├── orders/      # fulfill.ts (creación del pedido), status.ts (reglas de estado, compartidas con scripts/), tipos
 │   ├── checkout.ts  # Recalcula precios y construye los parámetros de Stripe
 │   ├── schemas.ts   # Esquemas Zod (checkout, login, registro, IDs)
 │   └── stripe.ts    # Cliente Stripe (server-only) y tarifas de envío
@@ -89,16 +101,17 @@ web/
 └── .env.example
 ```
 
-Datos compartidos con el agente (solo lectura desde aquí): `../data/catalog.json`,
-`../data/shipping_policy.md` y `../data/demo_orders.json`. El catálogo y la política se empaquetan en el
-build (import estático), así que funcionan igual en local y en Vercel.
+**Fuente de verdad del catálogo**: con `FIREBASE_ADMIN_CREDENTIALS`, la colección `products` de Firestore, que se
+gestiona desde el panel. `../data/catalog.json` es solo la **semilla inicial** (`scripts/seed.ts`) y el catálogo de
+desarrollo cuando no hay credenciales. La política de envíos sigue el mismo esquema (`content/shipping_policy` o
+`../data/shipping_policy.md`).
 
 ## Rutas y páginas
 
 | Ruta | Tipo | Acceso | Descripción |
 |---|---|---|---|
 | `/` | Estática + ISR (5 min) | Público | Home (port del diseño aprobado) |
-| `/productos/colchon-cafetal`, `/productos/colchon-caribe` | SSG + ISR | Público | Ficha con configurador, tabla de núcleos, fundas, envío, opiniones demo y recomendado |
+| `/productos/[slug]` | SSG (slugs de Firestore) + ISR, `dynamicParams` | Público | Ficha con configurador, tabla de núcleos, fundas, envío, opiniones demo y recomendado. Los productos creados después del build se generan bajo demanda |
 | `/carrito` | Cliente | Público (pagar exige sesión) | Líneas, cantidades, total estimado y botón de pago |
 | `/login`, `/registro` | Cliente | Público | Google arriba, separador "o con tu correo" y formulario |
 | `/pedidos` | Cliente | Sesión | Mis pedidos (Firestore, `userId == uid`, `createdAt desc`) |
@@ -106,6 +119,7 @@ build (import estático), así que funcionan igual en local y en Vercel.
 | `/checkout/exito?session_id=…` | Cliente | Sesión | Consulta cada 2 s (máx. ~1 min) hasta que el webhook haya creado el pedido. **No crea nada** |
 | `/checkout/cancelado` | Estática | Público | Pago cancelado; el carrito se conserva |
 | `/envios-y-devoluciones` | ISR | Público | Política en markdown (Firestore `content/shipping_policy` o `data/shipping_policy.md`) |
+| `/admin`, `/admin/productos`, `/admin/productos/nuevo`, `/admin/productos/[slug]`, `/admin/pedidos`, `/admin/pedidos/[id]` | Cliente | Claim `admin` | Panel de administración (`noindex`) |
 
 ## API routes
 
@@ -138,6 +152,10 @@ catálogo** (Firestore o JSON), y crea la sesión con `mode=payment`, EUR, `loca
 | 200 | `{ "received": true, "result": "created" \| "duplicate" }` |
 | Errores | 400 firma ausente o inválida (no se escribe nada) · 500 fallo al guardar (Stripe reintenta) · 503 sin configurar |
 
+Tras guardar el pedido envía el email de confirmación al cliente y, aparte, el **aviso "Nuevo pedido" a la tienda**
+(`ADMIN_NOTIFICATION_EMAIL`, o `GMAIL_USER` si falta) con número, total, artículos, dirección y enlace a
+`/admin/pedidos/<id>`. Cada envío va en su propio `try/catch`: si falla se registra y el pedido queda guardado.
+
 Crea `orders/{session.id}` en **una transacción** que lee el pedido (si existe, no hace nada) y el contador
 `counters/orders`, y escribe ambos: así un evento repetido o concurrente no duplica el pedido ni consume
 número. `orderNumber` = `CP-` + 6 dígitos. Los ítems e importes salen de Stripe
@@ -156,6 +174,10 @@ y `statusHistory` empieza con `paid`. Después envía el email; si falla, se reg
 Hace upsert de `users/{uid}` con `email`, `displayName`, `photoURL` (solo `https://`), `provider`
 (`password` o `google.com`), `updatedAt` y `createdAt` (solo la primera vez). Se llama tras el registro con
 correo y tras cada acceso con Google. Existe porque las reglas no permiten escribir `users` desde el cliente.
+
+### `/api/admin/**`
+
+Ver [Panel de administración → API](#api-del-panel).
 
 ## Flujo de compra
 
@@ -254,6 +276,121 @@ sequenceDiagram
 - Responsive: panel de 400 px abajo a la derecha en escritorio, pantalla completa en móvil; Escape lo cierra y
   el foco vuelve al botón flotante.
 - Contrato completo y códigos: [`agent/README.md`](../agent/README.md#contrato-de-chat-y-eventos-sse).
+
+## Panel de administración
+
+### Dar (o quitar) el rol de administrador
+
+El rol es un **custom claim de Firebase Auth** (`admin: true`). Solo lo puede poner el Admin SDK, desde
+[`scripts/set-admin.ts`](../scripts/README.md#set-admints):
+
+```bash
+cd scripts
+npm run admin:set -- persona@ejemplo.com             # asigna (idempotente)
+npm run admin:set -- persona@ejemplo.com --revoke    # quita el rol y revoca sus sesiones
+```
+
+La persona debe haberse registrado (o entrado con Google) antes. Después basta con **recargar `/admin`**: la guarda
+pide un ID token nuevo con `getIdTokenResult(true)`, así que no hace falta cerrar sesión.
+
+### Rutas
+
+| Ruta | Qué se hace |
+|---|---|
+| `/admin` | Resumen: pedidos y facturación de hoy (hora de Madrid, sin cancelados), pendientes de preparar (y cuántos sin revisar), en preparación y enviados. Cada cifra enlaza al listado filtrado |
+| `/admin/productos` | Todos los productos, **también los inactivos**: activar/desactivar, editar, ver en la tienda y eliminar con confirmación en la propia página (foco en "Cancelar", Escape cierra). Los documentos de Firestore que no cumplen el esquema se listan aparte para poder borrarlos |
+| `/admin/productos/nuevo` y `/admin/productos/[slug]` | Formulario completo (ver abajo) |
+| `/admin/pedidos` | Todos los pedidos, del más reciente al más antiguo, de 20 en 20 ("Cargar más"), con filtro por estado (`?estado=paid`) y búsqueda por número `CP-000123`. Distintivo **Nuevo** en los pagados que nadie ha abierto todavía |
+| `/admin/pedidos/[id]` | Detalle (artículos, dirección, cliente, historial, transportista) y **cambio de estado**. Abrirlo marca `reviewedAt` |
+
+El enlace "Panel de administración" (`components/admin/AdminNavLink.tsx`) solo se pinta para administradores; va
+en el menú de cuenta de la cabecera.
+
+### Productos
+
+- Campos del documento `products/{slug}`: slug (validado `^[a-z0-9]+(-[a-z0-9]+)*$`, único, **inmutable** tras
+  crear porque es el ID), nombre, descripción corta y larga, imágenes, opciones (Medida/Núcleo/Funda u otras, hasta 6),
+  detalles de opciones (filas clave/valor por valor; los números se guardan como números: la tabla de núcleos usa
+  `alturaCm`, `capas`, `garantiaAnos`…), características, variantes y activo.
+- **Imágenes**: selector con las fotos de `public/images` (lista generada en el build por `/api/catalog/images`),
+  ordenables (la primera es la principal). También se admite una ruta `/images/…` o una URL `https://` de
+  `images.unsplash.com`, `firebasestorage.googleapis.com` o `storage.googleapis.com` (`lib/catalog/image-hosts.ts`,
+  también en `images.remotePatterns`; pasan por `/_next/image`, así que la CSP no cambia). Firebase Storage no está
+  configurado en el proyecto: **subir ficheros desde el panel es una mejora pendiente**; hoy se copian a
+  `public/images` y se despliega.
+- **Variantes**: "Generar combinaciones" crea una variante por combinación de opciones con un SKU legible
+  (`CAF-150190-BRISA-ALGODO`, prefijo editable) y el precio base; conserva las existentes con su precio y stock, y
+  avisa de las que ya no encajan para quitarlas. Tabla editable de SKU, precio (acepta coma decimal) y stock, y ajuste
+  masivo "sumar X € a las variantes con Núcleo = Ceiba+". Renombrar una opción o un valor actualiza variantes y
+  detalles.
+- **Validación**: el mismo esquema Zod (`lib/catalog/admin-schema.ts`, `.strict()`) en el formulario y en la API:
+  SKU `^[A-Z0-9-]{3,40}$` único en el producto y combinación única; cada variante con un valor válido por opción;
+  precio 0–100 000 € con dos decimales; sin imágenes, opciones ni valores repetidos. La API comprueba además, en una
+  transacción, que el slug no exista (409) y que ningún SKU lo use **otro** producto (409). `priceFrom`, `currency`,
+  `updatedAt` (y `createdAt` al crear) los pone el servidor.
+- Tras cada escritura se llama a `revalidatePath` de `/`, `/productos/<slug>` y `/productos/[slug]` (todas las fichas,
+  por la sección "también te puede gustar"): el cambio se ve al momento.
+- Un producto **desactivado o eliminado** desaparece de la home y su ficha da 404; además no se puede comprar
+  (`findBySku` solo busca en activos) y una variante con `inStock: false` da 409 en el checkout. Los pedidos ya
+  hechos conservan sus datos.
+
+### Pedidos
+
+- Transiciones (`lib/orders/status.ts`, compartido con `scripts/update-order-status.ts`): **Pagado → En preparación
+  → Enviado → Entregado**, paso a paso, y **Cancelado** solo desde Pagado o En preparación. Entregado y Cancelado
+  son finales. Cualquier otra → **409** en el servidor. Los nombres son siempre `STATUS_LABELS` de `lib/schemas.ts`
+  (los mismos que en "Mis pedidos" y en el asistente).
+- Cada cambio, en una transacción, actualiza `status` y `updatedAt` y añade `{status, at}` a `statusHistory`.
+- Al pasar a **Enviado** son obligatorios transportista, número de seguimiento y fecha estimada (`AAAA-MM-DD`
+  válida); si falta alguno → 400. Al pasar a Entregado sin fecha estimada se pone la de hoy.
+- **Email al cliente** al pasar a Enviado (transportista, seguimiento y fecha), Entregado y Cancelado, con casilla
+  "Avisar al cliente por email" para no enviarlo. Idempotente: el envío se registra en `notifiedStatuses.<estado>` y
+  no se repite; además repetir un estado es una transición inválida (409, sin email). Si el email falla, el estado
+  se guarda igual y el panel lo indica.
+- Cancelar pide confirmación en la página y **no reembolsa** en Stripe (se hace desde el dashboard de Stripe).
+- El asistente lee Firestore en cada consulta: tras cambiar el estado, *"¿Cómo va mi pedido CP-000123?"* responde
+  con el estado nuevo, igual que "Mis pedidos" al recargar.
+
+### API del panel
+
+Todas exigen `Authorization: Bearer <ID token>`, responden `Cache-Control: no-store` y mensajes genéricos en español.
+
+| Método y ruta | Cuerpo / parámetros | Respuestas |
+|---|---|---|
+| `GET /api/admin/products` | — | 200 `{products, invalid}` |
+| `POST /api/admin/products` | Producto (`adminProductSchema`) | 201 · 400 `{error, fields}` · 409 slug o SKU duplicado |
+| `GET /api/admin/products/[slug]` | — | 200 `{product}` · 404 |
+| `PUT /api/admin/products/[slug]` | Producto completo; `slug` igual al de la URL | 200 · 400 (también si cambia el slug) · 404 · 409 SKU |
+| `PATCH /api/admin/products/[slug]` | `{active: boolean}` | 200 · 400 · 404 |
+| `DELETE /api/admin/products/[slug]` | — | 200 · 404 |
+| `GET /api/admin/orders` | `?status=&cursor=&limit=1–50&orderNumber=CP-000123` | 200 `{orders, nextCursor}` · 400 |
+| `GET /api/admin/orders/[id]` | — (marca `reviewedAt` la primera vez) | 200 `{order}` · 404 |
+| `PATCH /api/admin/orders/[id]` | `{status, carrier?, trackingNumber?, estimatedDelivery?, notifyCustomer?}` | 200 `{order, email}` · 400 · 404 · 409 transición inválida |
+| `GET /api/admin/summary` | — | 200 `{today:{orders,revenue}, pendingPreparation, unreviewed, preparing, shipped}` |
+
+`email` vale `sent`, `failed`, `skipped` (no se pidió aviso), `already_sent` o `not_applicable` (En preparación).
+
+### Seguridad
+
+- **Autorización siempre en servidor** (`lib/admin/auth.ts`): cada ruta verifica el ID token con firebase-admin
+  **comprobando revocación** (`verifyIdToken(token, true)`) → 401 si falta, es inválido o se revocó; y exige
+  `admin === true` en el token → 403 (un `"true"` en texto no vale). Sin credenciales de Admin → 503. Los accesos
+  denegados y las escrituras se registran con el `uid`.
+- La guarda de `/admin/**` (`RequireAdmin`) es solo experiencia de usuario: sin sesión redirige a
+  `/login?next=…`, sin claim a `/`. Los datos solo llegan por la API.
+- Las **reglas de Firestore no cambian**: siguen sin permitir escrituras de cliente y el claim `admin` no da ningún
+  acceso extra desde el navegador (hay tests). El panel lee y escribe solo por la API con el Admin SDK.
+- `noindex` doble: `robots` en el metadata de `app/admin/layout.tsx` y cabecera `X-Robots-Tag` en `next.config.ts`.
+- Payloads `.strict()` con límites de tamaño; IDs de pedido `cs_…` y slugs validados antes de tocar Firestore;
+  URLs de imagen con lista blanca de hosts; sin `confirm()` ni HTML crudo.
+
+### Si Firestore falla
+
+En modo Firestore el catálogo **nunca vuelve al JSON** (un producto borrado no puede reaparecer):
+`CatalogUnavailableError`. Las páginas ISR siguen sirviendo la última versión buena ya generada; una página sin
+versión previa muestra `app/error.tsx` ("No hemos podido cargar esta página", con Reintentar); `/api/checkout`
+responde 503; si falla durante el build, las fichas se generan bajo demanda. Cero productos o un slug inexistente
+son respuestas válidas (home vacía, 404).
 
 ## Diseño
 
@@ -381,6 +518,7 @@ navegar y las funciones que dependen de ellas muestran un aviso controlado.
 | `GMAIL_USER` | Config | Email | Cuenta de Gmail remitente. Sin ella el email solo se registra en logs |
 | `GMAIL_APP_PASSWORD` | **Secreta** | Email | Contraseña de aplicación de esa cuenta (requiere verificación en dos pasos) |
 | `EMAIL_FROM_NAME` | Config | Email | Nombre visible del remitente. Por defecto `Colchones Contoso` |
+| `ADMIN_NOTIFICATION_EMAIL` | Config | Aviso de pedido nuevo | Destinatario del email "Nuevo pedido" a la tienda. Si falta, se usa `GMAIL_USER` |
 
 ## Ejecutar en local
 
@@ -404,7 +542,7 @@ npm run test:coverage           # Vitest + cobertura (coverage/index.html)
 ```
 
 Sin credenciales: home, fichas, carrito, envíos y login responden 200; el catálogo sale de
-`data/catalog.json`; `/api/checkout`, `/api/webhooks/stripe` y `/api/users/me` devuelven 503 con mensaje; el
+`data/catalog.json` (solo en este modo de desarrollo); el panel muestra "no disponible" y `/api/admin/**` responde 503; `/api/checkout`, `/api/webhooks/stripe` y `/api/users/me` devuelven 503 con mensaje; el
 login muestra "Inicio de sesión no disponible"; el asistente avisa de que falta `NEXT_PUBLIC_AGENT_URL`.
 
 Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.md`](../scripts/README.md).
@@ -438,20 +576,22 @@ Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.
 4. **Webhook de Stripe** (modo test): *Developers → Webhooks → Add endpoint*
    `https://<app>.vercel.app/api/webhooks/stripe`, evento `checkout.session.completed`. Copiar su
    *Signing secret* en `STRIPE_WEBHOOK_SECRET` y redeplegar.
-5. **Firebase**: añadir `<app>.vercel.app` a *Authorized domains* y desplegar reglas e índices.
+5. **Firebase**: añadir `<app>.vercel.app` a *Authorized domains* y desplegar reglas e índices (incluye el índice
+   `orders (status, createdAt)` del filtro del panel). Dar el rol de administrador con `scripts/set-admin.ts`.
 6. **Agente**: incluir `https://<app>.vercel.app` en `ALLOWED_ORIGINS` del agente.
 7. Activar *Deployment Protection* en previews.
 
 ## Tests
 
 ```bash
-npm test                 # 108 tests, sin red ni credenciales reales
+npm test                 # 237 tests, sin red ni credenciales reales
 npm run test:coverage    # informe en coverage/
 ```
 
 firebase-admin, Stripe (excepto la verificación de firma, que usa la librería real con un secreto de prueba),
 Nodemailer y `fetch` están simulados; Firestore se sustituye por un doble en memoria con transacciones
-serializadas (`tests/helpers/fakeFirestore.ts`).
+serializadas, consultas (`where`, `orderBy`, `startAfter`, `limit`, `count`) y fallos simulados
+(`tests/helpers/fakeFirestore.ts`).
 
 | Grupo | Fichero | Qué cubre |
 |---|---|---|
@@ -464,6 +604,12 @@ serializadas (`tests/helpers/fakeFirestore.ts`).
 | Render del chat | `tests/components/chat-markdown.test.tsx`, `chat-widget.test.tsx` | `<script>` y `<img onerror>` no llegan al DOM; `javascript:` neutralizado; markdown normal; widget: tokens en vivo, `replace` sustituye el texto, 401 ofrece login, 429 y `error` muestran el mensaje, contador de 1000 caracteres, HTML del usuario como texto |
 | Cabeceras y entorno | `tests/security/headers-and-env.test.ts` | `next.config` expone CSP, X-Frame-Options, X-Content-Type-Options y Referrer-Policy; orígenes de Firebase/Google/agente en la CSP; `'unsafe-eval'` solo en dev; `.env.example` sin valores; ninguna `NEXT_PUBLIC_` con nombre de secreto (en `.env.example` y en el código); secretos solo en módulos `server-only`/route handlers; clientes solo leen `NEXT_PUBLIC_`; sin `dangerouslySetInnerHTML` |
 | Varios | `tests/unit/misc.test.ts` | Mensajes de error de Auth en español; `next` seguro (sin redirecciones abiertas); formato de precios/fechas; `verifyBearer` (cabeceras mal formadas, token rechazado); `EmailSender` (log sin credenciales, Gmail por SMTP seguro con destinatario y remitente correctos, propagación de errores y pedido sin email) |
+| Panel: productos | `tests/api/admin-products.test.ts` | Sin token 401 y sin claim 403 (también `admin: "true"`) en todas las rutas, sin escribir; `checkRevoked`; 503 sin configurar; lista con inactivos e inválidos; crear con `priceFrom`/fechas de servidor y `revalidatePath`; slug duplicado 409; SKU de otro producto 409; SKU repetido 400; 13 payloads inválidos 400 (slug, imágenes `javascript:`/`..`/otro host, campos extra, precios, opciones); PUT conserva `createdAt`, slug inmutable, 404, 409; PATCH `{active}`; DELETE y 404; 500 sin filtrar detalles |
+| Panel: pedidos | `tests/api/admin-orders.test.ts` | 401/403 (también el dueño del pedido sin claim); orden por fecha, filtro, paginación con cursor, búsqueda, filtros no válidos; `reviewedAt` idempotente; transiciones válidas e inválidas (8 casos, 409 sin escribir); shipped exige los tres datos y fecha real; email al cliente una sola vez, `notifyCustomer: false`, `already_sent`, fallo de email sin deshacer el estado; resumen (medianoche de Madrid en verano/invierno, facturación sin cancelados) |
+| Panel: lógica | `tests/unit/admin-logic.test.ts` | Ida y vuelta formulario ↔ esquema con el producto semilla; lista blanca de imágenes; duplicados; decimales; generador de variantes (conserva, añade, huérfanas, colisiones de SKU); renombrar opciones/valores; reglas de estado y nombres compartidos con `lib/schemas` |
+| Panel: guarda | `tests/components/require-admin.test.tsx` | Sin sesión → login con `next`; sin claim → inicio; con claim → `getIdTokenResult(true)` y panel; enlace visible solo para admins |
+| Emails del panel | `tests/unit/admin-emails.test.ts`, `tests/api/webhook.test.ts` | Aviso a la tienda (destinatario, `GMAIL_USER` por defecto, contenido y enlace al panel, opciones ordenadas); emails de Enviado/Entregado/Cancelado; webhook: aviso una sola vez, su fallo no bloquea el pedido ni el email al cliente |
+| Catálogo en Firestore | `tests/unit/catalog-firestore.test.ts` | Sin fallback al JSON: cero productos → `[]`, borrado → `null`, fallo → `CatalogUnavailableError`; solo activos; checkout con precio de Firestore, inactivo 400, sin stock 409 |
 
 Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README.md`](../firebase/README.md).
 
@@ -490,6 +636,10 @@ Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README
   (Baleares/Canarias). Mejora: crear la sesión en dos pasos o validar en el webhook.
 - CSP con `'unsafe-inline'` en scripts (limitación de Next.js sin nonces).
 - Las guardas de ruta son de cliente; la protección de datos está en las reglas de Firestore y en la API.
+- Panel: sin subida de imágenes (Firebase Storage no configurado), sin historial de cambios de productos ni
+  roles más finos que `admin`, sin reembolsos desde el panel y sin edición de pedidos más allá del estado. El
+  selector de imágenes se genera en el build (una foto nueva en `public/images` exige redeplegar).
+- Borrar un producto es definitivo (no hay papelera); desactivarlo es la opción reversible.
 - Sin gestión de stock real (`inStock` es un dato del catálogo) ni cálculo de impuestos por región.
 - Las opiniones de la home y las fichas son de ejemplo y están marcadas como tales.
 - Los colchones "A medida" no piden las medidas exactas en la web; se acuerdan después por email.

@@ -8,6 +8,7 @@ import { loginSchema, registerSchema } from "@/lib/schemas";
 import { ArrowRight } from "@/components/ui/Icons";
 import { Notice } from "@/components/ui/Notice";
 import { useAuth } from "./AuthProvider";
+import { PasswordInput } from "./PasswordInput";
 import { safeNext } from "./RequireAuth";
 
 type Mode = "login" | "register";
@@ -86,16 +87,27 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <label className="label" htmlFor={name}>
         {label}
       </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        required
-        className="field"
-        aria-invalid={Boolean(fieldErrors[name])}
-        aria-describedby={fieldErrors[name] ? `${name}-error` : undefined}
-      />
+      {type === "password" ? (
+        <PasswordInput
+          id={name}
+          name={name}
+          autoComplete={autoComplete}
+          required
+          aria-invalid={Boolean(fieldErrors[name])}
+          aria-describedby={fieldErrors[name] ? `${name}-error` : undefined}
+        />
+      ) : (
+        <input
+          id={name}
+          name={name}
+          type={type}
+          autoComplete={autoComplete}
+          required
+          className="field"
+          aria-invalid={Boolean(fieldErrors[name])}
+          aria-describedby={fieldErrors[name] ? `${name}-error` : undefined}
+        />
+      )}
       {fieldErrors[name] && (
         <p id={`${name}-error`} className="field-error mt-1 text-sm text-danger">
           {fieldErrors[name]}

@@ -10,15 +10,10 @@ export function firmness(product: Product): string | undefined {
 }
 
 /** Distintivo comercial por producto (demo). */
-const RIBBONS: Record<string, { text: string; tone?: "new" }> = {
-  "colchon-caribe": { text: "Más vendido" },
-  "colchon-cafetal": { text: "Nuevo", tone: "new" },
-};
-
 export function ProductCard({ product }: { product: Product }) {
   const image = product.images[0];
   const tag = firmness(product);
-  const ribbon = RIBBONS[product.slug];
+  const ribbon = product.badge ?? null;
   const href = `/productos/${product.slug}`;
   return (
     <article className="product-card card lift flex flex-col">
@@ -42,8 +37,8 @@ export function ProductCard({ product }: { product: Product }) {
           <span className="mono absolute top-4 left-4 rounded-full bg-ink px-3 py-1 text-xs text-bg">{tag}</span>
         )}
         {ribbon && (
-          <span className={`ribbon${ribbon.tone === "new" ? " is-new" : ""}`}>
-            {ribbon.tone !== "new" && <span aria-hidden="true">★</span>}
+          <span className={`ribbon${ribbon.tone === "nuevo" ? " is-new" : ""}`}>
+            {ribbon.tone !== "nuevo" && <span aria-hidden="true">★</span>}
             {ribbon.text}
           </span>
         )}

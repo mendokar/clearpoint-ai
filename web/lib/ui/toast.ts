@@ -5,7 +5,7 @@ export type Toast = {
   text: string;
   tone?: "ok" | "info";
   action?: { label: string; run: () => void };
-  /** ms hasta cerrarse solo (por defecto 4500). */
+  /** ms hasta cerrarse solo (por defecto 4500, u 8000 si tiene acción como "Deshacer"). */
   duration?: number;
 };
 
