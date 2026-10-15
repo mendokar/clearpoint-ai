@@ -13,6 +13,7 @@ import { useHydrated } from "@/lib/cart/useHydrated";
 import { prefersReducedMotion } from "@/lib/motion/hooks";
 import { toast } from "@/lib/ui/toast";
 import { useCheckout } from "./useCheckout";
+import { formatOptions, orderedOptionEntries } from "@/lib/format";
 
 const LEAVE_MS = 260;
 
@@ -71,7 +72,7 @@ export function CartView() {
                   <Link href={`/productos/${line.slug}`} className="font-display text-lg font-bold no-underline transition-colors hover:text-aji-ink">
                     {line.name}
                   </Link>
-                  <p className="text-sm text-muted">{Object.entries(line.options).map(([k, v]) => `${k}: ${v}`).join(" · ")}</p>
+                  <p className="text-sm text-muted">{orderedOptionEntries(line.options).map(([k, v]) => `${k}: ${v}`).join(" · ")}</p>
                   <p className="mono text-xs text-muted">SKU {line.sku}</p>
                 </div>
                 <b className="font-display text-lg tabular-nums">
@@ -81,14 +82,14 @@ export function CartView() {
               <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
                 <QuantityStepper
                   value={line.quantity}
-                  label={`${line.name} (${Object.values(line.options).join(", ")})`}
+                  label={`${line.name} (${formatOptions(line.options, ", ")})`}
                   onChange={(n) => setQuantity(line.sku, n)}
                 />
                 <button
                   type="button"
                   onClick={() => onRemove(line)}
                   className="rounded-md px-1 text-sm text-muted underline transition-colors hover:text-danger"
-                  aria-label={`Eliminar ${line.name} (${Object.values(line.options).join(", ")})`}
+                  aria-label={`Eliminar ${line.name} (${formatOptions(line.options, ", ")})`}
                 >
                   Eliminar
                 </button>

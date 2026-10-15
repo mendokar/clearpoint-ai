@@ -22,7 +22,7 @@ function ToastItem({ toast }: { toast: Toast }) {
   const dismiss = useToasts((s) => s.dismiss);
   const [leaving, setLeaving] = useState(false);
   const [paused, setPaused] = useState(false);
-  const remaining = useRef(toast.duration ?? 4500);
+  const remaining = useRef(toast.duration ?? (toast.action ? 8000 : 4500));
 
   useEffect(() => {
     if (leaving) {

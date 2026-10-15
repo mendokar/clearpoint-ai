@@ -35,6 +35,19 @@ describe("Toaster", () => {
     expect(useToasts.getState().toasts).toHaveLength(0);
   });
 
+  it("los avisos con acción duran más que los informativos (QA: deshacer en móvil)", async () => {
+    render(<Toaster />);
+    act(() => void toast({ text: "Eliminado", action: { label: "Deshacer", run: () => {} } }));
+    act(() => void toast({ text: "Añadido" }));
+    await act(async () => vi.advanceTimersByTime(4500));
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(screen.queryByText("Añadido")).toBeNull();
+    expect(screen.getByText("Eliminado")).toBeTruthy();
+    await act(async () => vi.advanceTimersByTime(3500));
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(screen.queryByText("Eliminado")).toBeNull();
+  });
+
   it("como máximo muestra tres avisos a la vez", () => {
     render(<Toaster />);
     act(() => {
