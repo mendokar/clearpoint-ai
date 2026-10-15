@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import type { CatalogRepository } from "./catalog/repository";
 import { checkoutRequestSchema } from "./schemas";
 import { SHIPPING_RATES } from "./stripe";
+import { formatOptions } from "./format";
 
 export type PricedLine = {
   sku: string;
@@ -39,7 +40,7 @@ export async function priceCart(body: unknown, catalog: Pick<CatalogRepository, 
     const found = await catalog.findBySku(sku);
     if (!found) throw new CheckoutError(400, "Alguno de los productos ya no está disponible.");
     if (!found.variant.inStock) {
-      throw new CheckoutError(409, `${found.product.name} (${Object.values(found.variant.options).join(", ")}) está agotado.`);
+      throw new CheckoutError(409, `${found.product.name} (${formatOptions(found.variant.options, ", ")}) está agotado.`);
     }
     lines.push({
       sku,

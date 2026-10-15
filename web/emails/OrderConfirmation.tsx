@@ -13,6 +13,7 @@ import {
   Text,
 } from "@react-email/components";
 import type { OrderEmail } from "@/lib/email/sender";
+import { formatOptions } from "../lib/format";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 
@@ -54,7 +55,7 @@ export default function OrderConfirmationEmail({ order, siteUrl }: { order: Orde
                   <Text style={{ margin: 0, fontWeight: 600 }}>
                     {item.name} × {item.quantity}
                   </Text>
-                  <Text style={{ margin: 0, fontSize: 13, color: c.muted }}>{Object.values(item.options).join(" · ")}</Text>
+                  <Text style={{ margin: 0, fontSize: 13, color: c.muted }}>{formatOptions(item.options)}</Text>
                 </Column>
                 <Column align="right">
                   <Text style={{ margin: 0 }}>{eur.format(item.unitPrice * item.quantity)}</Text>

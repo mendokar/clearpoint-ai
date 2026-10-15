@@ -13,6 +13,7 @@ import { cartCount, cartSubtotal, useCart } from "@/lib/cart/store";
 import { useHydrated } from "@/lib/cart/useHydrated";
 import { useFocusTrap } from "@/lib/motion/hooks";
 import { useCheckout } from "./useCheckout";
+import { formatOptions } from "@/lib/format";
 
 /** Mini-carrito lateral que se abre al añadir un producto. */
 export function CartDrawer() {
@@ -83,7 +84,7 @@ export function CartDrawer() {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="font-display text-lg leading-tight font-bold">{last.name}</p>
-                  <p className="mt-1 text-sm text-muted">{Object.values(last.options).join(" · ")}</p>
+                  <p className="mt-1 text-sm text-muted">{formatOptions(last.options)}</p>
                   <p className="mt-1 flex items-baseline justify-between gap-2 text-sm">
                     <span className="mono text-muted">× {last.quantity}</span>
                     <b className="font-display tabular-nums">

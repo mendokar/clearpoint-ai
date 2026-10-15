@@ -52,6 +52,7 @@ Contoso es una tienda online de colchones de adulto con identidad colombiana: ta
 | Proyecto Firebase con reglas, índices y datos de demo | `firebase/`, `scripts/` | ✅ Activo y verificado |
 | Stripe en modo test | `web/` | ✅ Checkout probado en local y webhook de producción creado |
 | Email de confirmación por Gmail | `web/` | ✅ Envío real probado |
+| Panel de administración: colchones, pedidos y avisos por email | `web/app/admin`, `scripts/set-admin.ts` | ✅ Hecho y probado con dobles. Falta asignar el rol admin en el proyecto real |
 | Despliegue de la web en Vercel | — | ⏳ Pendiente de variables y de llevar el código a master |
 | Memoria técnica | `docs/` | ⏳ Pendiente |
 
@@ -93,6 +94,7 @@ clearpoint-ai/
 ├── webbase/        Páginas de referencia de Clearpoint (solo consulta local, excluida de Git)
 ├── docs/           Memoria técnica
 ├── ARQUITECTURA.md Documento de arquitectura
+├── PLAN_DE_PRUEBAS.md Plan de pruebas para QA: pruebas automáticas y casos manuales
 └── README.md       Este documento
 ```
 
@@ -126,6 +128,26 @@ Los comandos exactos y las opciones sin credenciales están en el README de cada
 
 ---
 
+## Panel de administración
+
+Ruta `/admin`, solo para cuentas con el rol de administrador. El detalle está en [`web/README.md`](web/README.md).
+
+- **Colchones.** Crear, editar, activar, desactivar y borrar productos, con sus opciones, variantes, precios, stock, imágenes y etiqueta de tarjeta. Los cambios se ven en la tienda y en el asistente al momento.
+- **Pedidos.** Lista del más reciente al más antiguo, filtro por estado y distintivo de pedido nuevo. El estado avanza de Pagado a En preparación, Enviado y Entregado, o pasa a Cancelado desde los dos primeros. Al pasar a Enviado se piden transportista, seguimiento y fecha estimada.
+- **Emails.** La tienda recibe un aviso por cada pedido nuevo. El cliente recibe un email al pasar a Enviado, Entregado o Cancelado, salvo que se desmarque la casilla.
+- **Resumen.** Pedidos y facturación del día, pendientes de preparar y enviados.
+
+Los datos de los colchones viven en Firestore. El fichero `data/catalog.json` solo sirve como semilla inicial y para desarrollo sin credenciales.
+
+Dar o quitar el rol a una cuenta que ya haya iniciado sesión al menos una vez:
+
+```bash
+cd scripts && npm run admin:set -- correo@dominio.com
+cd scripts && npm run admin:set -- correo@dominio.com --revoke
+```
+
+---
+
 ## Variables de entorno
 
 Ningún secreto se guarda en el repositorio. Cada proyecto incluye un `.env.example` sin valores.
@@ -140,6 +162,8 @@ Regla de oro: solo las variables con prefijo `NEXT_PUBLIC_` llegan al navegador,
 ---
 
 ## Pruebas
+
+El plan completo para QA, con los casos manuales de extremo a extremo, está en [`PLAN_DE_PRUEBAS.md`](PLAN_DE_PRUEBAS.md).
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
@@ -257,6 +281,8 @@ Resumen. El detalle está en la sección 8 de [`ARQUITECTURA.md`](ARQUITECTURA.m
 | 15/10/2026 | Respaldo Anthropic → OpenAI con el mecanismo de LangChain | Encaja con LangGraph y quita una dependencia |
 | 15/10/2026 | Login con **Google** además de correo y contraseña | Petición de producto |
 | 15/10/2026 | Email de confirmación por **Gmail (SMTP)** en lugar de Resend | Resend exige un dominio propio para enviar a cualquier cliente y no lo tenemos |
+| 16/10/2026 | **Panel de administración** con rol `admin` en Firebase y escrituras solo desde el servidor | Un ecommerce no puede tener los productos fijados en el código |
+| 16/10/2026 | Sin vuelta al catálogo local cuando se usa Firestore | Un colchón borrado reaparecía al mostrarse el fichero de semilla |
 | 15/10/2026 | Pruebas unitarias y de seguridad desde el inicio | Garantizar aislamiento entre usuarios y la integridad del pago |
 
 ---
@@ -266,7 +292,8 @@ Resumen. El detalle está en la sección 8 de [`ARQUITECTURA.md`](ARQUITECTURA.m
 Se irán ampliando. Las actuales son estas:
 
 - El límite de mensajes del asistente vive en memoria y no se comparte entre instancias.
-- No hay panel de administración. Los estados de los pedidos se cambian con un script.
+- El panel no sube imágenes, porque Firebase Storage no está activado. Las fotos se añaden a `web/public/images` o desde Unsplash.
+- Cancelar un pedido en el panel no hace el reembolso en Stripe.
 - No hay gestión real de stock ni de impuestos por región.
 - El email de confirmación sale de una cuenta de Gmail. Tiene un límite diario de unos 500 envíos y puede acabar en spam. Los usuarios demo tienen correos ficticios, así que para ver el email hay que comprar con una cuenta real o con Google.
 

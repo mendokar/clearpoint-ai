@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 import re
 
 import pytest
@@ -171,3 +172,40 @@ def test_tools_read_fresh_data_each_call(repo):
     assert get_my_order.invoke({"order_number": "CP-000123"}, cfg(UID_1, repo))["status"] == "paid"
     next(o for o in repo._orders if o["orderNumber"] == "CP-000123")["status"] = "shipped"
     assert get_my_order.invoke({"order_number": "CP-000123"}, cfg(UID_1, repo))["status"] == "shipped"
+
+
+# --- Defectos de QA: fechas, nombres de estado y orden de opciones ---------------------
+
+def test_order_dates_are_in_spanish_peninsular_time():
+    from app.tools import _local_date, _local_datetime
+
+    # 22:48 UTC del 15/10 son las 00:48 del 16/10 en Madrid (horario de verano, UTC+2).
+    assert _local_datetime("2026-10-15T22:48:00Z") == "16/10/2026 00:48"
+    assert _local_datetime(datetime(2026, 10, 15, 22, 48, tzinfo=timezone.utc)) == "16/10/2026 00:48"
+    assert _local_datetime(datetime(2026, 12, 31, 23, 30)) == "01/01/2027 00:30"  # sin zona = UTC, invierno UTC+1
+    assert _local_date("2026-10-16") == "16/10/2026"
+    assert _local_date("2026-10-15T23:30:00Z") == "16/10/2026"
+    assert _local_datetime(None) is None
+
+
+def test_status_labels_match_the_web():
+    from app.tools import STATUS_LABELS
+
+    assert STATUS_LABELS == {
+        "paid": "Pagado",
+        "preparing": "En preparación",
+        "shipped": "Enviado",
+        "delivered": "Entregado",
+        "cancelled": "Cancelado",
+    }
+
+
+def test_item_options_follow_store_order():
+    from app.tools import _ordered_options
+
+    assert list(_ordered_options({"Funda": "Algodón Tolima", "Medida": "90×190", "Núcleo": "Brisa"})) == [
+        "Medida",
+        "Núcleo",
+        "Funda",
+    ]
+    assert _ordered_options(None) == {}

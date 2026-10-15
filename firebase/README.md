@@ -47,8 +47,12 @@ Consecuencias:
   porque Firestore no puede garantizar que todos los resultados cumplan la regla.
 - Leer un pedido que aún no existe también da `permission-denied` (`resource` es nulo): la página
   `/checkout/exito` lo trata como "todavía no está" y vuelve a consultar.
-- Los pedidos solo los crea el webhook de Stripe (Admin SDK) y los cambios de estado el script
-  `scripts/update-order-status.ts`.
+- Los pedidos solo los crea el webhook de Stripe (Admin SDK) y los cambios de estado los hacen el panel de
+  administración (`/api/admin/orders`, Admin SDK) y el script `scripts/update-order-status.ts`.
+
+**Rol de administrador**: el custom claim `admin: true` (`scripts/set-admin.ts`) **no aparece en las reglas** a
+propósito. El panel lee y escribe solo a través de `/api/admin/**`, que verifica el token y el claim en el servidor
+y usa el Admin SDK. Así un admin no tiene más poder desde el navegador que cualquier usuario (hay tests).
 
 **Todo lo demás está denegado por defecto** (por ejemplo `counters/orders`, el contador de números de pedido).
 
@@ -57,8 +61,10 @@ Consecuencias:
 | Colección | Campos | Para |
 |---|---|---|
 | `orders` | `userId ASC`, `createdAt DESC` | "Mis pedidos" en la web y la tool `list_my_orders` del agente |
+| `orders` | `status ASC`, `createdAt DESC` | Filtro por estado del panel (`/api/admin/orders?status=…`) |
 
-Sin este índice la consulta falla con `FAILED_PRECONDITION` y un enlace para crearlo.
+Sin estos índices la consulta falla con `FAILED_PRECONDITION` y un enlace para crearlo. El resumen del panel usa
+consultas de un solo campo (`createdAt >=`, `status ==`), que no necesitan índice compuesto.
 
 ## Desplegar
 
@@ -92,7 +98,7 @@ npm run test:rules
 emulador, carga `firestore.rules`, ejecuta los tests y lo apaga. El proyecto `demo-*` no toca ningún proyecto
 real ni necesita credenciales. La primera vez descarga el jar del emulador (~60 MB) en `~/.cache/firebase`.
 
-Resultado actual: **11 tests en verde**.
+Resultado actual: **13 tests en verde**.
 
 | Caso | Esperado |
 |---|---|
@@ -107,6 +113,10 @@ Resultado actual: **11 tests en verde**.
 | Leer el perfil propio / ajeno / anónimo | Permitido / Denegado / Denegado |
 | Escribir el perfil propio desde el cliente | Denegado |
 | Leer o escribir `counters/orders` | Denegado |
+| Con claim `admin`: escribir productos/pedidos, leer pedidos ajenos o listarlos | Denegado (el panel va por la API) |
+
+Si el puerto 8080 está ocupado por otro proceso, ejecuta con una copia de `firebase.json` (fuera del repo) con otros
+puertos: `npx firebase emulators:exec --config /ruta/firebase.json --only firestore --project demo-contoso "npx vitest run"`.
 
 Los mensajes `PERMISSION_DENIED` que aparecen en la salida son los intentos que los tests esperan que fallen.
 

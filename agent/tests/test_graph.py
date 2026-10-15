@@ -62,6 +62,25 @@ async def test_flow_with_tool(repo):
     assert {o["orderNumber"] for o in result["orders"]} == {"CP-000101", "CP-000118", "CP-000123"}
 
 
+async def test_text_before_and_after_tool_is_separated(repo):
+    """Defecto de QA: el texto previo a una tool y el posterior salían pegados ("consulté.Ya lo comprobé")."""
+    pre = AIMessage(content="Lo consulto.", tool_calls=[{"name": "get_shipping_policy", "args": {}, "id": "c1"}])
+    model = ScriptedChatModel(script=[pre, AIMessage("Ya lo comprobé.")])
+    graph = build_graph(ChatModels(primary=model))
+    events = await collect(graph, user("¿envío a Baleares?"), None, repo)
+    assert text_of(events) == "Lo consulto.\n\nYa lo comprobé."
+
+
+async def test_prompt_forbids_self_correction_of_previous_answers():
+    """Defecto de QA: el modelo dudaba de sus respuestas previas porque el historial no muestra las tools."""
+    from app.prompts import build_system_prompt
+
+    for authenticated in (True, False):
+        prompt = build_system_prompt(authenticated)
+        assert "No las corrijas" in prompt
+        assert "No anuncies que vas a consultar" in prompt
+
+
 async def test_system_prompt_is_set_by_server(repo):
     model = ScriptedChatModel(script=[AIMessage("ok")])
     graph = build_graph(ChatModels(primary=model))

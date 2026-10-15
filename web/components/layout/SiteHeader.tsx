@@ -9,6 +9,7 @@ import { cartCount, useCart } from "@/lib/cart/store";
 import { useHydrated } from "@/lib/cart/useHydrated";
 import { toast } from "@/lib/ui/toast";
 import { LogoMark } from "./Logo";
+import { AdminNavLink } from "@/components/admin/AdminNavLink";
 
 const TOPBAR = [
   { icon: TruckIcon, text: "Envío gratis a la España peninsular en 24 a 72 h" },
@@ -160,6 +161,11 @@ function AccountButton() {
           <Link role="menuitem" href="/pedidos" className="block rounded-lg px-3 py-2 text-sm no-underline hover:bg-tint">
             Mis pedidos
           </Link>
+          <AdminNavLink
+            role="menuitem"
+            onClick={() => setMenu(false)}
+            className="block rounded-lg px-3 py-2 text-sm font-semibold text-aji-ink no-underline hover:bg-tint"
+          />
           <button
             role="menuitem"
             type="button"

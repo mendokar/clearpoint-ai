@@ -33,6 +33,26 @@ export function formatDate(value: unknown, withTime = false): string {
   }).format(d);
 }
 
-export function optionsLabel(options: Record<string, string>): string {
-  return Object.values(options).join(" · ");
+/** Orden de presentación de las opciones de un colchón. Las desconocidas van después, por orden alfabético. */
+const OPTION_ORDER = ["Medida", "Núcleo", "Funda"];
+
+/**
+ * Opciones en orden estable. Firestore devuelve los mapas con las claves ordenadas alfabéticamente y Stripe
+ * en el orden de la sesión, así que no se puede confiar en el orden en que llegan (defecto de QA).
+ */
+export function orderedOptionEntries(options: Record<string, string> | null | undefined): [string, string][] {
+  const rank = (k: string) => {
+    const i = OPTION_ORDER.indexOf(k);
+    return i === -1 ? OPTION_ORDER.length : i;
+  };
+  return Object.entries(options ?? {}).sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, "es"));
 }
+
+/** "135×190 · Brisa · Algodón Tolima", siempre en el mismo orden. */
+export function formatOptions(options: Record<string, string> | null | undefined, separator = " · "): string {
+  return orderedOptionEntries(options)
+    .map(([, v]) => v)
+    .join(separator);
+}
+
+export const optionsLabel = formatOptions;

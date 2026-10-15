@@ -5,7 +5,9 @@
   "scripts": {
     "seed": "tsx --env-file=.env seed.ts",
     "order:status": "tsx --env-file=.env update-order-status.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "admin:set": "tsx --env-file=.env set-admin.ts",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "firebase-admin": "13.5.0",
