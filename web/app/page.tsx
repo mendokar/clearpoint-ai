@@ -2,6 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { OpenChatButton } from "@/components/chat/ChatContext";
 import { Benefits } from "@/components/home/Benefits";
+import { CountUp } from "@/components/home/CountUp";
+import { TrustBadges } from "@/components/home/TrustBadges";
+import { ArrowRight } from "@/components/ui/Icons";
 import { ProductCard } from "@/components/home/ProductCard";
 import { Reviews } from "@/components/home/Reviews";
 import { CoresTable } from "@/components/product/CoresTable";
@@ -18,8 +21,8 @@ export default async function HomePage() {
       {/* Hero */}
       <section>
         <div className="wrap grid items-center gap-8 py-10 md:grid-cols-[1.1fr_.9fr] md:gap-12 md:py-14">
-          <div>
-            <span className="eyebrow">Colchones para descansar de verdad</span>
+          <div className="enter">
+            <span className="eyebrow block">Colchones para descansar de verdad</span>
             <h1 className="mt-[.9rem] mb-5 text-[clamp(2.4rem,5.4vw,4.4rem)] font-extrabold tracking-[-.03em]">
               Dormir con la calma de una <em className="text-aji not-italic">siesta</em> en tierra caliente.
             </h1>
@@ -29,27 +32,30 @@ export default async function HomePage() {
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link className="btn btn-primary" href="#productos">
-                Elegir mi colchón
+                Elegir mi colchón <ArrowRight />
               </Link>
               <OpenChatButton className="btn btn-ghost">Preguntar al asistente</OpenChatButton>
             </div>
-            <div className="mt-9 flex flex-wrap gap-8 border-t border-line pt-6">
+            <TrustBadges />
+            <div className="mt-7 flex flex-wrap gap-8 border-t border-line pt-6">
               <Fact value="90 a 180" label="cm de ancho" />
               <Fact value="A medida" label="para cualquier cama" />
               <Fact value="4,8 / 5" label="valoración media" mono />
             </div>
           </div>
           <figure className="relative m-0">
-            <Image
+            <div className="hero-photo">
+              <Image
               src="/images/hero.jpg"
               alt="Cama con edredón naranja iluminada por la luz dorada de la tarde que entra por una ventana en arco"
               width={800}
               height={1200}
               priority
               sizes="(max-width: 860px) 100vw, 520px"
-              className="aspect-[4/3] w-full rounded-[160px_160px_var(--r)_var(--r)] object-cover md:aspect-[4/5] md:rounded-[220px_220px_var(--r)_var(--r)]"
+              className="h-full w-full object-cover"
             />
-            <div className="font-display absolute bottom-7 left-3 max-w-48 rounded-card bg-panela px-4 py-3 text-[.95rem] leading-tight font-semibold text-[#2C1B12] shadow-[0_10px_30px_rgba(44,27,18,.2)] md:-left-[18px]">
+            </div>
+            <div className="hero-seal font-display absolute bottom-7 left-3 max-w-48 rounded-card bg-panela px-4 py-3 text-[.95rem] leading-tight font-semibold text-[#2C1B12] shadow-[0_10px_30px_rgba(44,27,18,.2)] md:-left-[18px]">
               <span className="mono mb-1 block text-[.7rem] font-medium tracking-[.1em] uppercase">Hecho en Colombia</span>
               Algodón del Tolima en cada funda
             </div>
@@ -62,7 +68,7 @@ export default async function HomePage() {
 
       <section className="section" id="beneficios" aria-labelledby="beneficios-title">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head" data-reveal>
             <div>
               <span className="eyebrow">Por qué Contoso</span>
               <h2 id="beneficios-title">Todo lo que una buena noche necesita</h2>
@@ -78,14 +84,14 @@ export default async function HomePage() {
 
       <section className="section flush scroll-mt-24" id="productos" aria-labelledby="productos-title">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head" data-reveal>
             <div>
               <span className="eyebrow">Nuestros colchones</span>
               <h2 id="productos-title">Dos colchones, cada uno con su carácter</h2>
             </div>
             <p>Configura medida, núcleo y funda. El precio se actualiza al instante y pagas con tarjeta de forma segura.</p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2" data-reveal="stagger">
             {products.map((p) => (
               <ProductCard key={p.slug} product={p} />
             ))}
@@ -96,7 +102,7 @@ export default async function HomePage() {
 
       <section className="section flush scroll-mt-24" id="nucleos" aria-labelledby="nucleos-title">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head" data-reveal>
             <div>
               <span className="eyebrow">Dos núcleos</span>
               <h2 id="nucleos-title">Brisa para empezar, Ceiba+ para ir más allá</h2>
@@ -106,7 +112,7 @@ export default async function HomePage() {
               una capa extra de confort.
             </p>
           </div>
-          <div className="grid items-stretch gap-6 md:grid-cols-[.8fr_1.2fr]">
+          <div className="grid items-stretch gap-6 md:grid-cols-[.8fr_1.2fr]" data-reveal>
             <figure className="m-0 flex flex-col gap-1.5">
               <Image
                 src="/images/textura.jpg"
@@ -124,9 +130,9 @@ export default async function HomePage() {
       </section>
 
       <section className="bg-ink text-bg" aria-labelledby="prueba-title">
-        <div className="wrap grid items-center gap-6 py-14 md:grid-cols-[auto_1fr_auto] md:gap-10">
+        <div className="wrap grid items-center gap-6 py-14 md:grid-cols-[auto_1fr_auto] md:gap-10" data-reveal="stagger">
           <div className="mono font-display text-[clamp(4rem,10vw,7rem)] leading-[.9] font-extrabold tracking-[-.04em] text-panela">
-            30
+            <CountUp to={30} />
             <span className="mono mt-1.5 block text-[.9rem] font-medium tracking-[.14em] text-bg uppercase">
               noches de prueba
             </span>
@@ -140,24 +146,26 @@ export default async function HomePage() {
               entrega y te reembolsamos el importe.
             </p>
           </div>
-          <Link className="btn border-bg text-bg" href="/envios-y-devoluciones">
-            Ver envíos y devoluciones
+          <Link className="btn border-bg text-bg hover:bg-bg hover:text-ink" href="/envios-y-devoluciones">
+            Ver envíos y devoluciones <ArrowRight />
           </Link>
         </div>
       </section>
 
       <section className="section scroll-mt-24" id="taller" aria-labelledby="taller-title">
         <div className="wrap grid items-start gap-8 md:grid-cols-2 md:gap-12">
-          <div>
+          <div data-reveal>
             <figure className="m-0 mb-6">
+              <div className="overflow-hidden rounded-card">
               <Image
                 src="/images/taller.jpg"
                 alt="Dormitorio amplio con cama baja de madera clara, alfombras de lana y luz natural"
                 width={1200}
                 height={800}
                 sizes="(max-width: 860px) 100vw, 560px"
-                className="aspect-[3/2] w-full rounded-card object-cover"
+                className="aspect-[3/2] w-full object-cover transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)] hover:scale-[1.04]"
               />
+              </div>
               <figcaption className="credit mt-1.5">Foto: Roberto Nickson en Unsplash</figcaption>
             </figure>
             <span className="eyebrow">El taller</span>
@@ -174,7 +182,7 @@ export default async function HomePage() {
               a España desde nuestro almacén en Madrid.
             </p>
           </div>
-          <ol className="m-0 grid list-none p-0">
+          <ol className="m-0 grid list-none p-0" data-reveal="stagger">
             {[
               ["Cortamos el núcleo", "A la medida exacta de tu cama, también si es a medida."],
               ["Cosemos la funda", "Costura doble y cremallera oculta para lavarla sin esfuerzo."],
@@ -182,8 +190,11 @@ export default async function HomePage() {
               ["Lo enrollamos y enviamos", "Llega enrollado en una caja que cabe por cualquier puerta."],
               ["Lo recibes", "En 24 a 72 horas laborables. Los pedidos a medida tardan unos 30 días."],
             ].map(([title, text], i) => (
-              <li key={title} className="grid grid-cols-[3rem_1fr] gap-4 border-t border-line py-[1.1rem]">
-                <span className="mono pt-1 text-[.9rem] text-aji-ink" aria-hidden="true">
+              <li key={title} className="group grid grid-cols-[3rem_1fr] gap-4 border-t border-line py-[1.1rem]">
+                <span
+                  className="mono pt-1 text-[.9rem] text-aji-ink transition-transform duration-300 group-hover:translate-x-1.5"
+                  aria-hidden="true"
+                >
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div>
@@ -204,7 +215,7 @@ export default async function HomePage() {
 
       <section className="section flush scroll-mt-24" id="asistente" aria-labelledby="asistente-title">
         <div className="wrap">
-          <div className="grid items-center gap-10 rounded-[21px] bg-tint p-6 md:grid-cols-2 md:p-12">
+          <div className="grid items-center gap-10 rounded-[21px] bg-tint p-6 md:grid-cols-2 md:p-12" data-reveal>
             <div>
               <span className="eyebrow">Asistente Contoso</span>
               <h2 id="asistente-title" className="mt-2.5 mb-4 text-[clamp(1.8rem,3.2vw,2.5rem)] font-extrabold">
@@ -224,12 +235,15 @@ export default async function HomePage() {
                   ),
                 )}
               </ul>
-              <OpenChatButton className="btn btn-primary mt-6">Abrir el asistente</OpenChatButton>
+              <OpenChatButton className="btn btn-primary mt-6">
+                Abrir el asistente <ArrowRight />
+              </OpenChatButton>
             </div>
             <div
               className="card flex min-w-0 flex-col gap-3 p-5 text-[.93rem]"
               aria-label="Ejemplo de conversación con el asistente"
               role="group"
+              data-reveal="stagger"
             >
               <span className="mono text-[.7rem] tracking-[.1em] text-muted uppercase">Ejemplo</span>
               <div className="max-w-[88%] self-end rounded-[14px] rounded-br-[4px] bg-ink px-4 py-2.5 text-bg">
@@ -248,9 +262,11 @@ export default async function HomePage() {
                 El Caribe con núcleo Ceiba+ y funda de algodón. Los muelles ensacados dejan pasar el aire y el núcleo
                 reforzado alivia hombro y cadera.
               </div>
-              <OpenChatButton className="flex items-center gap-2 rounded-full border border-line py-1.5 pr-1.5 pl-4 text-left text-muted">
+              <OpenChatButton className="group flex items-center gap-2 rounded-full border border-line py-1.5 pr-1.5 pl-4 text-left text-muted transition-colors hover:border-aji">
                 <span className="min-w-0 flex-1 truncate">Escribe tu pregunta…</span>
-                <b className="rounded-full bg-aji px-3.5 py-1.5 text-sm text-on-accent">Enviar</b>
+                <b className="rounded-full bg-aji px-3.5 py-1.5 text-sm text-on-accent transition-transform duration-200 group-hover:scale-105">
+                  Enviar
+                </b>
               </OpenChatButton>
             </div>
           </div>

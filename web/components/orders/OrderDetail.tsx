@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Notice } from "@/components/ui/Notice";
-import { Spinner } from "@/components/ui/Spinner";
+import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import { formatDate, formatPrice } from "@/lib/format";
 import { fetchMyOrder, type OrderWithId } from "@/lib/orders/client";
 import { orderIdSchema, STATUS_LABELS } from "@/lib/schemas";
@@ -35,7 +35,7 @@ export function OrderDetail({ id }: { id: string }) {
     );
   }
   if (error) return <Notice tone="error">{error}</Notice>;
-  if (!order) return <Spinner label="Cargando el pedido…" />;
+  if (!order) return <OrderDetailSkeleton />;
 
   const reached = new Set(order.statusHistory.map((h) => h.status));
   const historyAt = (s: string) => order.statusHistory.find((h) => h.status === s)?.at;
@@ -55,16 +55,26 @@ export function OrderDetail({ id }: { id: string }) {
             <ol className="m-0 grid list-none gap-0 p-0">
               {STATUS_FLOW.map((s, i) => {
                 const done = reached.has(s);
+                const nextDone = reached.has(STATUS_FLOW[i + 1]);
+                const current = done && !nextDone;
+                const style = { "--i": i } as React.CSSProperties;
                 return (
                   <li key={s} className="grid grid-cols-[1.5rem_1fr] gap-3 pb-4 last:pb-0">
                     <span className="flex flex-col items-center">
                       <span
-                        className={`h-4 w-4 rounded-full border-2 ${done ? "border-aji bg-aji" : "border-line bg-surface"}`}
+                        style={style}
+                        className={`timeline-dot h-4 w-4 rounded-full border-2 ${done ? "border-aji bg-aji" : "border-line bg-surface"}${
+                          current && order.status !== "delivered" ? " is-current" : ""
+                        }`}
                         aria-hidden="true"
                       />
-                      {i < STATUS_FLOW.length - 1 && <span className="w-px flex-1 bg-line" aria-hidden="true" />}
+                      {i < STATUS_FLOW.length - 1 && (
+                        <span className="timeline-line w-0.5 flex-1 bg-line" aria-hidden="true">
+                          {nextDone && <span style={style} />}
+                        </span>
+                      )}
                     </span>
-                    <div className={done ? "" : "text-muted"}>
+                    <div className={`timeline-text ${done ? "" : "text-muted"}`} style={style}>
                       <p className="font-semibold">
                         {STATUS_LABELS[s]}
                         <span className="sr-only">{done ? " (completado)" : " (pendiente)"}</span>
@@ -152,5 +162,26 @@ export function OrderDetail({ id }: { id: string }) {
         </p>
       </aside>
     </div>
+  );
+}
+
+function OrderDetailSkeleton() {
+  return (
+    <SkeletonGroup label="Cargando el pedido…" className="grid items-start gap-8 lg:grid-cols-[1.3fr_.9fr]">
+      <div className="card flex flex-col gap-4 p-6">
+        <Skeleton className="h-6 w-1/4" />
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton className="h-4 w-4 rounded-full" />
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+        ))}
+      </div>
+      <div className="card flex flex-col gap-3 p-6">
+        <Skeleton className="h-6 w-1/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+    </SkeletonGroup>
   );
 }

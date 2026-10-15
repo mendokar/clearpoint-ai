@@ -1,43 +1,90 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatedPrice } from "@/components/ui/AnimatedPrice";
+import { BagIcon, CheckIcon, LockIcon, MoonIcon, TruckIcon } from "@/components/ui/Icons";
 import { findVariant, type Product } from "@/lib/catalog/types";
+import { useCartDrawer } from "@/lib/cart/drawer";
 import { MAX_QTY_PER_LINE, useCart } from "@/lib/cart/store";
+import { useHydrated } from "@/lib/cart/useHydrated";
 import { formatPrice } from "@/lib/format";
+import { prefersReducedMotion } from "@/lib/motion/hooks";
 import { initialSelection, resolveSelection, valueState } from "./selection";
+
+type AddState = "idle" | "loading" | "done";
+
+/** Tiempos del botón "Añadir": breve estado de carga, check y vuelta al reposo. */
+export const ADD_TIMINGS = { loading: 350, done: 1800 };
 
 export function ProductConfigurator({ product }: { product: Product }) {
   const [selection, setSelection] = useState<Record<string, string>>(() => initialSelection(product));
   const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
+  const [addState, setAddState] = useState<AddState>("idle");
   const add = useCart((s) => s.add);
+  const showDrawer = useCartDrawer((s) => s.show);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const showBar = useStickyBar(buttonRef);
+  const mounted = useHydrated();
 
   const variant = useMemo(() => findVariant(product, selection), [product, selection]);
 
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
   const choose = (option: string, value: string) => {
     setSelection((prev) => resolveSelection(product, prev, option, value));
-    setAdded(false);
   };
 
   const onAdd = () => {
-    if (!variant || !variant.inStock) return;
-    add(
-      {
-        sku: variant.sku,
-        slug: product.slug,
-        name: product.name,
-        options: variant.options,
-        unitPrice: variant.price,
-        image: product.images[0],
-      },
-      quantity,
-    );
-    setAdded(true);
+    if (!variant || !variant.inStock || addState !== "idle") return;
+    const commit = () => {
+      add(
+        {
+          sku: variant.sku,
+          slug: product.slug,
+          name: product.name,
+          options: variant.options,
+          unitPrice: variant.price,
+          image: product.images[0],
+        },
+        quantity,
+      );
+      setAddState("done");
+      showDrawer(variant.sku);
+      timers.current.push(setTimeout(() => setAddState("idle"), ADD_TIMINGS.done));
+    };
+    if (prefersReducedMotion()) {
+      commit();
+      return;
+    }
+    setAddState("loading");
+    timers.current.push(setTimeout(commit, ADD_TIMINGS.loading));
   };
 
   const isCustom = selection["Medida"] === "A medida";
   const fundaInfo = product.optionDetails?.["Funda"]?.[selection["Funda"] ?? ""]?.descripcion;
+  const disabled = !variant || !variant.inStock;
+  const label = !variant
+    ? "Elige una combinación"
+    : variant.inStock
+      ? "Añadir al carrito"
+      : "Agotado en esta combinación";
+
+  const addContent = (compact = false) =>
+    addState === "loading" ? (
+      <span className="add-state" key="loading">
+        <span className="btn-spinner" aria-hidden="true" /> Añadiendo…
+      </span>
+    ) : addState === "done" ? (
+      <span className="add-state" key="done">
+        <CheckIcon className="check-draw h-5 w-5" /> Añadido
+      </span>
+    ) : (
+      <span className="add-state" key="idle">
+        {!disabled && <BagIcon className="h-5 w-5" />} {compact && !disabled ? "Añadir" : label}
+      </span>
+    );
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,7 +92,9 @@ export function ProductConfigurator({ product }: { product: Product }) {
         <fieldset key={option.name} className="m-0 border-0 p-0">
           <legend className="label mb-2 flex w-full justify-between">
             <span>{option.name}</span>
-            <span className="tracking-normal normal-case text-ink">{selection[option.name]}</span>
+            <span key={selection[option.name]} className="add-state tracking-normal normal-case text-ink">
+              {selection[option.name]}
+            </span>
           </legend>
           <div className="flex flex-wrap gap-2">
             {option.values.map((value) => {
@@ -66,10 +115,11 @@ export function ProductConfigurator({ product }: { product: Product }) {
                   />
                   <label
                     htmlFor={id}
+                    data-checked={checked}
                     className={[
-                      "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-[.95rem] transition-colors",
+                      "opt-chip inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 text-[.95rem]",
                       "peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-panela",
-                      checked ? "border-ink bg-ink text-bg" : "border-line bg-surface hover:border-aji",
+                      checked ? "border-ink text-bg" : "border-line bg-surface hover:border-aji",
                       state === "missing" ? "cursor-not-allowed opacity-40 line-through" : "",
                       /\d/.test(value) ? "mono" : "",
                     ].join(" ")}
@@ -81,9 +131,13 @@ export function ProductConfigurator({ product }: { product: Product }) {
               );
             })}
           </div>
-          {option.name === "Funda" && fundaInfo && <p className="mt-2 text-sm text-muted">{String(fundaInfo)}</p>}
+          {option.name === "Funda" && fundaInfo && (
+            <p key={String(fundaInfo)} className="add-state mt-2 text-sm text-muted">
+              {String(fundaInfo)}
+            </p>
+          )}
           {option.name === "Medida" && isCustom && (
-            <p className="mt-2 text-sm text-muted">
+            <p className="add-state mt-2 text-sm text-muted">
               Fabricado bajo pedido: tras la compra te escribimos para confirmar las medidas. Entrega en unos 30 días y
               sin devolución salvo defecto de fabricación.
             </p>
@@ -95,13 +149,17 @@ export function ProductConfigurator({ product }: { product: Product }) {
         <div aria-live="polite">
           <span className="block text-sm text-muted">Precio</span>
           <b className="font-display text-[2.2rem] leading-none font-bold tabular-nums">
-            {variant ? formatPrice(variant.price) : "—"}
+            {variant ? <AnimatedPrice value={variant.price} /> : "—"}
           </b>
           <span className="mono mt-1 block text-xs text-muted">
             {variant ? <>SKU {variant.sku}</> : "Combinación no disponible"} · IVA incluido
           </span>
         </div>
-        <div className="flex items-center rounded-full border border-line bg-surface" role="group" aria-label="Cantidad">
+        <div
+          className="stepper flex items-center rounded-full border border-line bg-surface"
+          role="group"
+          aria-label="Cantidad"
+        >
           <button
             type="button"
             className="grid h-11 w-11 place-items-center rounded-full text-lg"
@@ -139,25 +197,91 @@ export function ProductConfigurator({ product }: { product: Product }) {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="btn btn-primary w-full"
-        onClick={onAdd}
-        disabled={!variant || !variant.inStock}
-      >
-        {!variant ? "Elige una combinación" : variant.inStock ? "Añadir al carrito" : "Agotado en esta combinación"}
-      </button>
-
-      <div aria-live="polite" className="min-h-[1.5rem]">
-        {added && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-ok bg-surface px-4 py-3 text-sm">
-            <span>Añadido al carrito.</span>
-            <Link href="/carrito" className="font-semibold text-aji-ink underline">
-              Ver carrito y pagar
-            </Link>
-          </p>
-        )}
+      <div className="flex flex-col gap-3">
+        <button
+          ref={buttonRef}
+          type="button"
+          className="add-btn btn btn-primary w-full"
+          data-state={addState}
+          onClick={onAdd}
+          disabled={disabled}
+          aria-busy={addState === "loading"}
+        >
+          {addContent()}
+        </button>
+        <ul className="seals m-0 grid list-none grid-cols-3 gap-2 p-0 text-center text-[.75rem] leading-tight text-muted">
+          <li className="flex flex-col items-center gap-1.5 rounded-xl bg-surface px-2 py-2.5">
+            <LockIcon className="h-5 w-5" /> Pago seguro
+          </li>
+          <li className="flex flex-col items-center gap-1.5 rounded-xl bg-surface px-2 py-2.5">
+            <MoonIcon className="h-5 w-5" /> 30 noches de prueba
+          </li>
+          <li className="flex flex-col items-center gap-1.5 rounded-xl bg-surface px-2 py-2.5">
+            <TruckIcon className="h-5 w-5" /> Envío 24–72 h
+          </li>
+        </ul>
       </div>
+
+      {/* En un portal: los ancestros animados con transform romperían el position: fixed. */}
+      {mounted &&
+        createPortal(
+          <div className="buybar" data-show={showBar} aria-hidden={!showBar} inert={!showBar}>
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{product.name}</p>
+                <p className="font-display text-lg leading-tight font-bold tabular-nums">
+                  {variant ? formatPrice(variant.price) : "—"}
+                  {quantity > 1 && <span className="mono ml-1.5 text-xs font-normal text-muted">× {quantity}</span>}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="add-btn btn btn-primary btn-sm !px-5 !py-3"
+                data-state={addState}
+                onClick={onAdd}
+                disabled={disabled}
+              >
+                {addContent(true)}
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
+}
+
+/** Muestra la barra fija de compra cuando el botón principal ha quedado por encima de la pantalla. */
+function useStickyBar(ref: React.RefObject<HTMLElement | null>): boolean {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Scroll pasivo + rAF (un IntersectionObserver no avisa si se salta el botón sin llegar a verlo).
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      setShow(el.getBoundingClientRect().bottom < 0);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [ref]);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (show) root.dataset.buybar = "true";
+    else delete root.dataset.buybar;
+    return () => {
+      delete root.dataset.buybar;
+    };
+  }, [show]);
+  return show;
 }

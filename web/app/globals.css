@@ -149,10 +149,7 @@
     text-decoration: none;
     border: 2px solid var(--ink);
     cursor: pointer;
-    transition: transform 0.15s ease;
-  }
-  .btn:hover:not(:disabled) {
-    transform: translateY(-2px);
+    /* Transiciones, brillo y estados en motion.css */
   }
   .btn:disabled {
     opacity: 0.55;
@@ -227,14 +224,9 @@
     letter-spacing: -0.02em;
   }
 
-  /* Franja wayuu: único gesto gráfico */
+  /* Franja wayuu: único gesto gráfico (el dibujo y su desplazamiento están en motion.css) */
   .wayuu {
     height: 16px;
-    background:
-      linear-gradient(135deg, var(--panela) 25%, transparent 25%) -8px 0/16px 16px,
-      linear-gradient(225deg, var(--panela) 25%, transparent 25%) -8px 0/16px 16px,
-      linear-gradient(315deg, var(--aji) 25%, transparent 25%) 0 0/16px 16px,
-      linear-gradient(45deg, var(--aji) 25%, var(--ink) 25%) 0 0/16px 16px;
   }
 
   /* Cabecera */
@@ -243,21 +235,10 @@
     color: var(--bg);
     font-size: 0.82rem;
   }
-  .topbar .wrap {
-    display: flex;
-    gap: 1.5rem;
-    justify-content: center;
-    flex-wrap: wrap;
-    padding-block: 0.45rem;
-  }
-  .topbar span {
-    white-space: nowrap;
-  }
   .site-header {
+    /* top, fondo translúcido y compactado al hacer scroll: motion.css */
     position: sticky;
-    top: env(safe-area-inset-top, 0px);
     z-index: 20;
-    background: var(--bg);
     border-bottom: 1px solid var(--line);
   }
   .site-header > .wrap {
@@ -341,7 +322,6 @@
   }
   @media (max-width: 860px) {
     .main-nav {
-      display: none;
       position: absolute;
       top: 100%;
       left: 0;
@@ -351,13 +331,50 @@
       background: var(--surface);
       border-bottom: 1px solid var(--line);
       padding: 0.5rem 20px 1rem;
+      box-shadow: 0 24px 40px -24px rgb(44 27 18 / 0.35);
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(-10px);
+      transform-origin: top;
+      transition:
+        opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+        visibility 0s linear 0.3s;
     }
     .main-nav.open {
-      display: flex;
+      visibility: visible;
+      opacity: 1;
+      transform: none;
+      transition:
+        opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+        visibility 0s;
     }
     .main-nav a {
       padding: 0.7rem 0;
       border-bottom: 1px solid var(--line);
+      opacity: 0;
+      transform: translateX(-10px);
+      transition:
+        opacity 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+        color 0.2s;
+    }
+    .main-nav.open a {
+      opacity: 1;
+      transform: none;
+    }
+    .main-nav.open a:nth-child(2) {
+      transition-delay: 40ms;
+    }
+    .main-nav.open a:nth-child(3) {
+      transition-delay: 80ms;
+    }
+    .main-nav.open a:nth-child(4) {
+      transition-delay: 120ms;
+    }
+    .main-nav.open a:nth-child(5) {
+      transition-delay: 160ms;
     }
     .menu-toggle {
       display: grid;

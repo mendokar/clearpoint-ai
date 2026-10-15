@@ -46,6 +46,7 @@ web/
 ├── app/
 │   ├── layout.tsx                 # Fuentes (next/font), cabecera, pie, proveedores y ChatWidget
 │   ├── globals.css                # Tokens del diseño (claro/oscuro) expuestos a Tailwind
+│   ├── motion.css                 # Curvas, keyframes, microinteracciones y estados de revelado
 │   ├── page.tsx                   # Home
 │   ├── productos/[slug]/page.tsx  # Ficha con galería y configurador (SSG + ISR 5 min)
 │   ├── carrito/page.tsx
@@ -61,17 +62,19 @@ web/
 │       └── users/me/route.ts          # POST: upsert del perfil users/{uid}
 ├── components/
 │   ├── auth/        # AuthProvider (contexto, Google, correo), AuthForm, RequireAuth
-│   ├── cart/        # CartView
+│   ├── cart/        # CartView, CartDrawer (mini-carrito lateral), useCheckout
 │   ├── chat/        # ChatWidget, ChatMarkdown (render seguro), ChatContext
-│   ├── home/        # ProductCard, Benefits, Reviews (opiniones demo)
+│   ├── home/        # ProductCard, Benefits, Reviews + ReviewsTrack (carrusel), CountUp, TrustBadges
 │   ├── layout/      # SiteHeader (mini-carrito y cuenta), SiteFooter, Logo
 │   ├── orders/      # OrdersList, OrderDetail, CheckoutSuccess, OrderStatus
 │   ├── product/     # ProductConfigurator, ProductGallery, CoresTable, selection.ts (lógica pura)
-│   └── ui/          # Notice, Spinner
+│   └── ui/          # Notice, Spinner, Skeleton, Toaster, AnimatedPrice, Icons, RevealObserver
 ├── emails/OrderConfirmation.tsx   # Plantilla React Email
 ├── lib/
 │   ├── catalog/     # Esquema Zod del catálogo y repositorio (Firestore o data/catalog.json)
-│   ├── cart/        # Store de Zustand
+│   ├── cart/        # Store de Zustand y estado del mini-carrito (drawer.ts)
+│   ├── motion/      # Hooks de movimiento: tween numérico, foco atrapado, prefers-reduced-motion
+│   ├── ui/toast.ts  # Cola de toasts (Zustand)
 │   ├── chat/client.ts   # ÚNICO módulo que conoce el contrato SSE del agente
 │   ├── email/       # Interfaz EmailSender + implementación Resend
 │   ├── firebase/    # admin.ts (server-only) y client.ts (navegador)
@@ -282,6 +285,56 @@ sequenceDiagram
   radios nativos con `fieldset`/`legend`, `aria-live` en precio y chat, textos alternativos, respeto de
   `prefers-reduced-motion`.
 
+### Movimiento y microinteracciones
+
+Todo vive en `app/motion.css` (capa `components`, sin tocar paleta ni tipografías) más unos pocos hooks en
+`lib/motion/hooks.ts`. Sin dependencias nuevas: CSS (transitions/keyframes), IntersectionObserver, rAF y la
+Web Animations API.
+
+- **Base**: curvas `--ease-out` `cubic-bezier(.2,.8,.2,1)` y `--ease-spring`, duraciones de 150/220/300 ms.
+  Se anima solo `transform` y `opacity` (las sombras de hover de los botones son la excepción, solo pintura;
+  en tarjetas la sombra es un pseudo-elemento que cambia de opacidad).
+- **Revelado al hacer scroll**: cualquier elemento con `data-reveal` (o `data-reveal="stagger"` para escalonar
+  sus hijos). `RevealObserver` (en el layout) solo oculta, ya con JS, lo que está por debajo de la pantalla y
+  lo muestra al entrar; lo que ya se ve no se anima. Sin JS, sin IntersectionObserver, al imprimir o con
+  movimiento reducido todo queda visible. Entradas al cargar con `.enter` (hijos escalonados, CSS puro).
+- **Botones**: elevación al pasar el ratón, brillo que cruza el primario, `scale(.97)` al pulsar, flecha
+  (`<ArrowRight />`, clase `btn-arrow`) que se desplaza. Foco visible con un pequeño "asentamiento" animado.
+- **Barra superior**: marquesina con cuatro mensajes (envío gratis, 30 noches, pago seguro con Stripe, cosido
+  en Medellín); se pausa al pasar el ratón, con el foco o con su botón de pausa (WCAG 2.2.2).
+- **Cabecera**: al salir de pantalla la barra superior, se compacta sin mover el contenido (`top` negativo del
+  `sticky` + `translate`, sin CLS), gana sombra y logo más pequeño; subrayado animado en los enlaces; "bump"
+  del contador del carrito al añadir; menú móvil con fundido, desplazamiento y enlaces escalonados (Escape lo
+  cierra).
+- **Hero**: titular, texto, CTA y sellos de confianza entran escalonados; foto en arco con zoom lento
+  (ken burns) y sello "Hecho en Colombia" flotando.
+- **Franja wayuu**: el dibujo se desplaza en horizontal de forma continua (pseudo-elemento con `transform`).
+- **Beneficios**: fondo que se templa, icono que sube, gira y se rellena de ají.
+- **Tarjetas de producto**: elevación con sombra, zoom de la foto, distintivo ("Más vendido" en Caribe,
+  "Nuevo" en Cafetal), botón "Ver detalles" que sube sobre la foto (solo con ratón) y chips con hover.
+- **Ficha**: galería con fundido entre fotos y zoom que sigue al ratón; chips con relleno animado al elegir;
+  precio con interpolación numérica (`AnimatedPrice`, el valor final va en texto para lectores de pantalla);
+  botón "Añadir" con estados cargando → check dibujado → reposo; sellos de confianza junto al CTA; al añadir
+  se abre el **mini-carrito lateral** (`CartDrawer`: diálogo modal, foco atrapado, Escape y clic fuera
+  cierran, bloquea el scroll del fondo, "Pagar"/"Inicia sesión para pagar", "Ver carrito", "Seguir mirando");
+  en móvil, **barra fija de compra** con precio y botón cuando el botón principal queda por encima de la
+  pantalla (se pinta en un portal y desplaza el botón del asistente).
+- **Carrito**: skeleton mientras se hidrata, líneas que entran escalonadas y salen deslizándose, las demás se
+  recolocan con FLIP; stepper −/+ con número que "salta"; totales interpolados; toast "eliminado" con
+  **Deshacer**; estado vacío ilustrado.
+- **30 noches**: contador de 0 a 30 al entrar en pantalla (en el HTML ya pone 30).
+- **Opiniones**: carrusel con scroll-snap y puntos en móvil; rejilla con elevación en escritorio.
+- **Asistente**: pulso suave del botón flotante la primera vez (`localStorage`), panel que se abre con
+  resorte (sube desde abajo en móvil) y se cierra con animación, foco atrapado y `aria-modal`, mensajes que
+  aparecen con fundido, puntos de "escribiendo" y chip animado al recibir `tool_start`.
+- **Cuenta, pedidos y pago**: formularios que entran escalonados, errores que aparecen (y el campo vibra),
+  botones con spinner; skeletons en listas y detalle; línea de estados del pedido que se dibuja paso a paso
+  con pulso en el estado actual; check dibujado con pequeño estallido en `/checkout/exito`.
+- **Toasts** (`toast({ text, action })`): región `aria-live`, máximo tres, se pausan con el ratón o el foco.
+  Se usan al eliminar una línea del carrito y al cerrar sesión.
+- **Movimiento reducido**: `prefers-reduced-motion` anula transiciones y animaciones; la marquesina pasa a
+  texto estático, no se arman revelados, contadores ni tweens, y el botón "Añadir" salta al estado final.
+
 ## Seguridad
 
 - **Cabeceras** (`security-headers.mjs`, aplicadas a todas las rutas): `Content-Security-Policy`,
@@ -391,7 +444,7 @@ Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.
 ## Tests
 
 ```bash
-npm test                 # 97 tests, sin red ni credenciales reales
+npm test                 # 108 tests, sin red ni credenciales reales
 npm run test:coverage    # informe en coverage/
 ```
 

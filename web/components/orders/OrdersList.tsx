@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Notice } from "@/components/ui/Notice";
-import { Spinner } from "@/components/ui/Spinner";
+import { ArrowRight } from "@/components/ui/Icons";
+import { SkeletonGroup, SkeletonRow } from "@/components/ui/Skeleton";
 import { formatDate, formatPrice } from "@/lib/format";
 import { fetchMyOrders, type OrderWithId } from "@/lib/orders/client";
 import { OrderStatusBadge } from "./OrderStatus";
@@ -26,14 +27,22 @@ export function OrdersList() {
   }, [user]);
 
   if (error) return <Notice tone="error">{error}</Notice>;
-  if (!orders) return <Spinner label="Cargando tus pedidos…" />;
+  if (!orders) {
+    return (
+      <SkeletonGroup label="Cargando tus pedidos…" className="grid gap-4">
+        <SkeletonRow media={false} />
+        <SkeletonRow media={false} />
+        <SkeletonRow media={false} />
+      </SkeletonGroup>
+    );
+  }
   if (orders.length === 0) {
     return (
-      <div className="card flex flex-col items-start gap-4 p-8">
+      <div className="card enter flex flex-col items-start gap-4 p-8">
         <h2 className="text-2xl font-bold">Todavía no tienes pedidos</h2>
         <p className="text-muted">Cuando compres un colchón lo verás aquí con su estado y seguimiento.</p>
         <Link href="/#productos" className="btn btn-primary">
-          Ver colchones
+          Ver colchones <ArrowRight />
         </Link>
       </div>
     );
@@ -41,11 +50,11 @@ export function OrdersList() {
 
   return (
     <ul className="m-0 grid list-none gap-4 p-0">
-      {orders.map((o) => (
-        <li key={o.id}>
+      {orders.map((o, i) => (
+        <li key={o.id} className="order-row" style={{ "--i": i } as React.CSSProperties}>
           <Link
             href={`/pedidos/${encodeURIComponent(o.id)}`}
-            className="card flex flex-wrap items-center justify-between gap-4 p-5 no-underline hover:border-aji"
+            className="card lift group flex flex-wrap items-center justify-between gap-4 p-5 no-underline transition-colors hover:border-aji"
           >
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-3">
@@ -56,7 +65,10 @@ export function OrdersList() {
                 {formatDate(o.createdAt)} · {o.items.map((i) => `${i.name} × ${i.quantity}`).join(", ")}
               </p>
             </div>
-            <b className="font-display text-xl tabular-nums">{formatPrice(o.total, o.currency)}</b>
+            <span className="flex items-center gap-3">
+              <b className="font-display text-xl tabular-nums">{formatPrice(o.total, o.currency)}</b>
+              <ArrowRight className="btn-arrow h-5 w-5 text-aji-ink" />
+            </span>
           </Link>
         </li>
       ))}

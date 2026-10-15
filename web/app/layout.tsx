@@ -5,7 +5,11 @@ import { ChatProvider } from "@/components/chat/ChatContext";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { CartDrawer } from "@/components/cart/CartDrawer";
+import { RevealObserver } from "@/components/ui/RevealObserver";
+import { Toaster } from "@/components/ui/Toaster";
 import "./globals.css";
+import "./motion.css";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -48,6 +52,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <main id="contenido">{children}</main>
             <SiteFooter />
             <ChatWidget />
+            <CartDrawer />
+            <Toaster />
+            <RevealObserver />
           </ChatProvider>
         </AuthProvider>
       </body>
