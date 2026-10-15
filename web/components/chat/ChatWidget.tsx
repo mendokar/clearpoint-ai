@@ -11,6 +11,7 @@ import {
   TOOL_LABELS,
   type ChatMessage,
 } from "@/lib/chat/client";
+import { useFocusTrap } from "@/lib/motion/hooks";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useChatUi } from "./ChatContext";
 
@@ -24,6 +25,8 @@ const SUGGESTIONS = [
 ];
 
 let nextId = 1;
+const SEEN_KEY = "contoso-chat-seen";
+const CLOSE_MS = 180;
 
 export function ChatWidget() {
   const { open, setOpen } = useChatUi();
@@ -37,11 +40,31 @@ export function ChatWidget() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const configured = Boolean(agentUrl());
+  const [closing, setClosing] = useState(false);
+  const [fresh, setFresh] = useState(false);
+
+  useFocusTrap(panelRef, open && !closing, { initial: inputRef });
+
+  // Pulso del botón flotante solo la primera vez (hasta que se abre el asistente).
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(SEEN_KEY)) setFresh(true);
+    } catch {
+      // almacenamiento bloqueado: sin pulso
+    }
+  }, []);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (!open) return;
+    setFresh(false);
+    try {
+      localStorage.setItem(SEEN_KEY, "1");
+    } catch {
+      // ignorado
+    }
   }, [open]);
 
   useEffect(() => {
@@ -51,8 +74,12 @@ export function ChatWidget() {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const close = useCallback(() => {
-    setOpen(false);
-    requestAnimationFrame(() => fabRef.current?.focus());
+    setClosing(true);
+    setTimeout(() => {
+      setClosing(false);
+      setOpen(false);
+      requestAnimationFrame(() => fabRef.current?.focus());
+    }, CLOSE_MS);
   }, [setOpen]);
 
   const send = useCallback(
@@ -134,18 +161,20 @@ export function ChatWidget() {
   return (
     <>
       {!open && (
-        <button ref={fabRef} className="fab" type="button" aria-label="Abrir el asistente" onClick={() => setOpen(true)}>
+        <button ref={fabRef} className={`fab${fresh ? " is-new" : ""}`} type="button" aria-label="Abrir el asistente" onClick={() => setOpen(true)}>
           <i aria-hidden="true" />
           ¿Te ayudo?
         </button>
       )}
       {open && (
         <div
+          ref={panelRef}
           role="dialog"
-          aria-modal="false"
+          aria-modal="true"
           aria-labelledby={titleId}
+          data-closing={closing}
           onKeyDown={(e) => e.key === "Escape" && close()}
-          className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:right-5 sm:bottom-5 sm:h-[min(640px,calc(100dvh-40px))] sm:w-[400px] sm:rounded-[20px] sm:border sm:border-line sm:shadow-[0_18px_48px_rgba(44,27,18,.28)]"
+          className="chat-panel fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:right-5 sm:bottom-5 sm:h-[min(640px,calc(100dvh-40px))] sm:w-[400px] sm:rounded-[20px] sm:border sm:border-line sm:shadow-[0_18px_48px_rgba(44,27,18,.28)]"
         >
           <div className="wayuu shrink-0 sm:rounded-t-[20px]" role="presentation" />
           <header className="flex items-center gap-3 border-b border-line px-4 py-3">
@@ -160,7 +189,7 @@ export function ChatWidget() {
                 {user ? "Puedo consultar tus pedidos" : "Inicia sesión para preguntar por tus pedidos"}
               </p>
             </div>
-            <button type="button" onClick={close} className="icon-btn" aria-label="Cerrar el asistente">
+            <button type="button" onClick={close} className="icon-btn chat-close" aria-label="Cerrar el asistente">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
@@ -175,18 +204,19 @@ export function ChatWidget() {
             )}
             {messages.length === 0 && (
               <div className="flex flex-col gap-3">
-                <p className="max-w-[88%] self-start rounded-[14px] rounded-bl-[4px] bg-tint px-4 py-3">
+                <p className="chat-msg from-bot max-w-[88%] self-start rounded-[14px] rounded-bl-[4px] bg-tint px-4 py-3">
                   ¡Hola! Te ayudo a elegir colchón, con envíos y devoluciones y, si inicias sesión, con tus pedidos.
                 </p>
                 <p className="mono text-xs tracking-widest text-muted uppercase">Prueba con</p>
                 <div className="flex flex-wrap gap-2">
-                  {SUGGESTIONS.map((s) => (
+                  {SUGGESTIONS.map((s, i) => (
                     <button
                       key={s}
                       type="button"
                       disabled={!configured || busy}
                       onClick={() => void send(s)}
-                      className="rounded-full border border-line bg-bg px-3 py-1.5 text-left text-sm hover:border-aji"
+                      className="suggestion chat-msg rounded-full border border-line bg-bg px-3 py-1.5 text-left text-sm"
+                      style={{ animationDelay: `${120 + i * 70}ms` }}
                     >
                       {s}
                     </button>
@@ -198,26 +228,26 @@ export function ChatWidget() {
               m.role === "user" ? (
                 <div
                   key={m.id}
-                  className="max-w-[88%] self-end rounded-[14px] rounded-br-[4px] bg-ink px-4 py-2.5 whitespace-pre-wrap text-bg"
+                  className="chat-msg from-user max-w-[88%] self-end rounded-[14px] rounded-br-[4px] bg-ink px-4 py-2.5 whitespace-pre-wrap text-bg"
                 >
                   <span className="sr-only">Tú: </span>
                   {m.content}
                 </div>
               ) : (
-                <div key={m.id} className="max-w-[88%] self-start rounded-[14px] rounded-bl-[4px] bg-tint px-4 py-2.5">
+                <div key={m.id} className="chat-msg from-bot max-w-[88%] self-start rounded-[14px] rounded-bl-[4px] bg-tint px-4 py-2.5">
                   <span className="sr-only">Asistente: </span>
                   {m.content ? <ChatMarkdown text={m.content} /> : <TypingDots />}
                 </div>
               ),
             )}
             {tool && (
-              <p className="mono flex items-center gap-2 self-start text-xs text-muted" role="status">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-panela" aria-hidden="true" />
+              <p key={tool} className="tool-chip self-start text-xs font-medium" role="status">
+                <span className="tool-spin" aria-hidden="true" />
                 {tool}…
               </p>
             )}
             {notice && (
-              <div role="alert" className="rounded-card border border-danger bg-surface px-3 py-2 text-sm">
+              <div role="alert" className="chat-msg rounded-card border border-danger bg-surface px-3 py-2 text-sm">
                 {notice.text}
                 {notice.login && (
                   <>
@@ -282,14 +312,10 @@ export function ChatWidget() {
 
 function TypingDots() {
   return (
-    <span className="inline-flex gap-1 py-1" aria-label="El asistente está escribiendo">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted"
-          style={{ animationDelay: `${i * 120}ms` }}
-        />
-      ))}
+    <span className="typing-dots inline-flex gap-1.5 py-1.5" role="img" aria-label="El asistente está escribiendo">
+      <span />
+      <span />
+      <span />
     </span>
   );
 }

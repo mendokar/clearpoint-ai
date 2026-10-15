@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Notice } from "@/components/ui/Notice";
+import { ArrowRight } from "@/components/ui/Icons";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useCart } from "@/lib/cart/store";
 import { fetchMyOrder, type OrderWithId } from "@/lib/orders/client";
@@ -80,7 +82,8 @@ export function CheckoutSuccess() {
 
   if (order) {
     return (
-      <div className="card flex flex-col items-start gap-4 p-8">
+      <div className="card enter flex flex-col items-start gap-4 p-8">
+        <SuccessMark />
         <span className="eyebrow">Pedido confirmado</span>
         <h2 className="text-3xl font-extrabold">
           ¡Gracias! Tu pedido es el <span className="mono">{order.orderNumber}</span>
@@ -91,7 +94,7 @@ export function CheckoutSuccess() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link href={`/pedidos/${encodeURIComponent(order.id)}`} className="btn btn-primary">
-            Ver mi pedido
+            Ver mi pedido <ArrowRight />
           </Link>
           <Link href="/" className="btn btn-ghost">
             Volver a la tienda
@@ -112,9 +115,29 @@ export function CheckoutSuccess() {
   }
 
   return (
-    <div className="card flex flex-col gap-2 p-8">
+    <div className="card flex flex-col gap-4 p-8">
       <Spinner label="Procesando tu pedido…" />
-      <p className="text-sm text-muted">Estamos confirmando el pago con Stripe. Suele tardar unos segundos.</p>
+      <p className="-mt-6 text-sm text-muted">Estamos confirmando el pago con Stripe. Suele tardar unos segundos.</p>
+      <div className="flex flex-col gap-2.5" aria-hidden="true">
+        <Skeleton className="h-7 w-2/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
     </div>
+  );
+}
+
+/** Check dibujado con un pequeño estallido, al confirmarse el pedido. */
+function SuccessMark() {
+  return (
+    <span className="success-mark" aria-hidden="true">
+      {Array.from({ length: 8 }, (_, i) => (
+        <span key={i} className="spark" style={{ "--a": `${i * 45}deg` } as React.CSSProperties} />
+      ))}
+      <span className="ring" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12.5l4.5 4.5L19 7.5" />
+      </svg>
+    </span>
   );
 }

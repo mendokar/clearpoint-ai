@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { authErrorMessage } from "@/lib/auth/errors";
 import { loginSchema, registerSchema } from "@/lib/schemas";
+import { ArrowRight } from "@/components/ui/Icons";
 import { Notice } from "@/components/ui/Notice";
 import { useAuth } from "./AuthProvider";
 import { safeNext } from "./RequireAuth";
@@ -96,7 +97,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         aria-describedby={fieldErrors[name] ? `${name}-error` : undefined}
       />
       {fieldErrors[name] && (
-        <p id={`${name}-error`} className="mt-1 text-sm text-danger">
+        <p id={`${name}-error`} className="field-error mt-1 text-sm text-danger">
           {fieldErrors[name]}
         </p>
       )}
@@ -109,9 +110,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
         type="button"
         onClick={onGoogle}
         disabled={busy !== null}
-        className="btn btn-ghost w-full border-line bg-surface"
+        className="btn btn-ghost group w-full border-line bg-surface hover:border-ink"
       >
-        <GoogleIcon />
+        {busy === "google" ? <span className="btn-spinner" aria-hidden="true" /> : <GoogleIcon />}
         {busy === "google" ? "Conectando con Google…" : "Continuar con Google"}
       </button>
 
@@ -119,14 +120,27 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <span className="h-px flex-1 bg-line" />o con tu correo<span className="h-px flex-1 bg-line" />
       </div>
 
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+      <form onSubmit={onSubmit} noValidate className="enter flex flex-col gap-4">
         {!isLogin && field("name", "Nombre", "text", "name")}
         {field("email", "Correo electrónico", "email", "email")}
         {field("password", "Contraseña", "password", isLogin ? "current-password" : "new-password")}
         {!isLogin && field("confirm", "Repite la contraseña", "password", "new-password")}
-        {error && <Notice tone="error">{error}</Notice>}
+        {error && (
+          <div className="notice-in" key={error}>
+            <Notice tone="error">{error}</Notice>
+          </div>
+        )}
         <button type="submit" className="btn btn-primary w-full" disabled={busy !== null}>
-          {busy === "email" ? (isLogin ? "Entrando…" : "Creando tu cuenta…") : isLogin ? "Iniciar sesión" : "Crear cuenta"}
+          {busy === "email" ? (
+            <>
+              <span className="btn-spinner" aria-hidden="true" />
+              {isLogin ? "Entrando…" : "Creando tu cuenta…"}
+            </>
+          ) : (
+            <>
+              {isLogin ? "Iniciar sesión" : "Crear cuenta"} <ArrowRight />
+            </>
+          )}
         </button>
       </form>
 

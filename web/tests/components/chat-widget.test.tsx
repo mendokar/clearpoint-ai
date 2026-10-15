@@ -120,4 +120,45 @@ describe("ChatWidget", () => {
     expect(document.querySelector("[role=dialog] img")).toBeNull();
     expect(screen.getByText("<script>alert(1)</script>")).toBeTruthy();
   });
+
+  it("Escape cierra el panel (tras la animación) y vuelve el botón flotante", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    renderWidget();
+    const dialog = screen.getByRole("dialog", { name: "Asistente Contoso" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(dialog.getAttribute("data-closing")).toBe("true");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("button", { name: "Abrir el asistente" })).toBeTruthy();
+  });
+
+  it("muestra el chip animado de herramienta al recibir tool_start", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const enc = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          new ReadableStream({
+            async start(c) {
+              c.enqueue(enc.encode(ev("tool_start", { name: "get_my_order" })));
+              await gate;
+              c.enqueue(enc.encode(ev("token", { text: "Listo" })));
+              c.enqueue(enc.encode(ev("done", {})));
+              c.close();
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "text/event-stream" } },
+        ),
+      ),
+    );
+    renderWidget();
+    ask("¿Y mi pedido?");
+    await waitFor(() => expect(document.querySelector(".tool-chip")).not.toBeNull());
+    expect(screen.getByRole("img", { name: "El asistente está escribiendo" })).toBeTruthy();
+    release();
+    await waitFor(() => expect(screen.getByText("Listo")).toBeTruthy());
+    expect(document.querySelector(".tool-chip")).toBeNull();
+  });
 });
