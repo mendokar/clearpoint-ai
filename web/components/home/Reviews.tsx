@@ -1,3 +1,5 @@
+import { ReviewsTrack } from "./ReviewsTrack";
+
 const DEMO_REVIEWS = [
   {
     stars: 5,
@@ -34,28 +36,39 @@ export function Reviews({ slug, title = "Lo que dicen quienes ya duermen en Cont
   const list = (slug ? DEMO_REVIEWS.filter((r) => r.slug === slug) : DEMO_REVIEWS.slice(0, 3)).slice(0, 3);
   return (
     <>
-      <div className="section-head">
+      <div className="section-head" data-reveal>
         <div>
           <span className="eyebrow">Opiniones</span>
           <h2>{title}</h2>
         </div>
         <p className="mono text-xs text-muted">Opiniones de ejemplo para la demo</p>
       </div>
-      <div className="grid gap-5 md:grid-cols-3">
+      <ReviewsTrack>
         {list.map((r) => (
-          <article key={r.name} className="card flex flex-col gap-4 p-6">
+          <article key={r.name} className="card lift relative flex flex-col gap-4 p-6">
+            <span className="review-quote" aria-hidden="true">
+              “
+            </span>
             <div className="tracking-[.15em] text-panela" role="img" aria-label={`${r.stars} de 5 estrellas`}>
               {"★".repeat(r.stars)}
               {"☆".repeat(5 - r.stars)}
             </div>
             <blockquote className="m-0 text-[.98rem]">{r.text}</blockquote>
-            <footer className="mt-auto text-sm text-muted">
-              <b className="block text-ink">{r.name}</b>
-              {r.detail}
+            <footer className="mt-auto flex items-center gap-3 text-sm text-muted">
+              <span
+                className="font-display grid h-9 w-9 flex-none place-items-center rounded-full bg-tint text-base font-bold text-ink"
+                aria-hidden="true"
+              >
+                {r.name.charAt(0)}
+              </span>
+              <span>
+                <b className="block text-ink">{r.name}</b>
+                {r.detail}
+              </span>
             </footer>
           </article>
         ))}
-      </div>
+      </ReviewsTrack>
     </>
   );
 }

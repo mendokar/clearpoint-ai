@@ -12,12 +12,17 @@ const ITEMS: { title: string; text: string; icon: React.ReactNode }[] = [
 export function Benefits({ limit }: { limit?: number }) {
   const items = limit ? ITEMS.slice(0, limit) : ITEMS;
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line md:grid-cols-4">
+    <div
+      className="grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line md:grid-cols-4"
+      data-reveal="stagger"
+    >
       {items.map((b) => (
-        <div key={b.title} className="flex flex-col gap-2 bg-surface p-[1.1rem] min-[421px]:p-6">
-          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" className="h-[34px] w-[34px] text-aji" aria-hidden="true">
-            {b.icon}
-          </svg>
+        <div key={b.title} className="benefit flex flex-col gap-2 bg-surface p-[1.1rem] min-[421px]:p-6">
+          <span className="benefit-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2">
+              {b.icon}
+            </svg>
+          </span>
           <h3 className="text-[1.1rem] font-semibold">{b.title}</h3>
           <p className="text-[.92rem] text-muted">{b.text}</p>
         </div>
