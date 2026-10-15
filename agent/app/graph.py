@@ -154,6 +154,9 @@ async def stream_chat(
     """
     provider: str | None = None
     tools_used: list[str] = []
+    # Cada llamada al modelo produce un mensaje con su propio id. Si el modelo escribe texto, consulta
+    # una tool y vuelve a escribir, los dos textos se separan para que no salgan pegados en la UI.
+    text_message_id: str | None = None
     async for mode, chunk in graph.astream(
         {"input": messages}, make_config(uid, repo), stream_mode=["messages", "updates"]
     ):
@@ -162,6 +165,9 @@ async def stream_chat(
             if meta.get("langgraph_node") == "agent" and isinstance(msg, AIMessage):
                 text = message_text(msg)
                 if text:
+                    if text_message_id is not None and msg.id != text_message_id:
+                        text = "\n\n" + text.lstrip()
+                    text_message_id = msg.id
                     yield "token", {"text": text}
             continue
 

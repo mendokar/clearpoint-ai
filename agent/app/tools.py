@@ -12,7 +12,8 @@ Reglas de seguridad:
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
@@ -24,8 +25,9 @@ SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+){0,7}$")
 ORDER_NUMBER_RE = re.compile(r"^CP-\d{6}$")
 MAX_ORDERS = 10
 
+# Mismos nombres que la web (web/lib/schemas.ts STATUS_LABELS) para que el cliente vea lo mismo en ambos sitios.
 STATUS_LABELS = {
-    "paid": "Pagado (preparación en curso)",
+    "paid": "Pagado",
     "preparing": "En preparación",
     "shipped": "Enviado",
     "delivered": "Entregado",
@@ -62,6 +64,48 @@ def _iso(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     return value
+
+
+# La tienda opera en España: las fechas se dan en hora peninsular, igual que la web (defecto de QA: el
+# asistente decía la fecha en UTC y no coincidía con la web).
+STORE_TZ = ZoneInfo("Europe/Madrid")
+OPTION_ORDER = ("Medida", "Núcleo", "Funda")
+
+
+def _local_datetime(value: Any) -> Any:
+    """Fecha y hora en hora peninsular española, como 'DD/MM/AAAA HH:MM'. Las fechas sin hora se dejan tal cual."""
+    dt: datetime | None = None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and "T" in value:
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+    if dt is None:
+        return _iso(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(STORE_TZ).strftime("%d/%m/%Y %H:%M")
+
+
+def _local_date(value: Any) -> Any:
+    """Solo la fecha (DD/MM/AAAA) en hora peninsular, para entregas estimadas."""
+    local = _local_datetime(value)
+    if isinstance(local, str) and len(local) >= 10 and local[2] == "/":
+        return local[:10]
+    if isinstance(local, str) and len(local) == 10 and local[4] == "-":
+        y, m, d = local.split("-")
+        return f"{d}/{m}/{y}"
+    return local
+
+
+def _ordered_options(options: Any) -> dict[str, Any]:
+    """Opciones en el orden Medida, Núcleo, Funda (Firestore las devuelve en orden alfabético)."""
+    if not isinstance(options, dict):
+        return {}
+    rank = {k: i for i, k in enumerate(OPTION_ORDER)}
+    return dict(sorted(options.items(), key=lambda kv: (rank.get(kv[0], len(OPTION_ORDER)), kv[0])))
 
 
 # --- Proyecciones (lista blanca de campos) -----------------------------------
@@ -110,10 +154,10 @@ def _order_common(o: dict[str, Any]) -> dict[str, Any]:
         "statusLabel": STATUS_LABELS.get(status, status),
         "total": o.get("total"),
         "currency": o.get("currency", "EUR"),
-        "createdAt": _iso(o.get("createdAt")),
+        "createdAt": _local_datetime(o.get("createdAt")),
         "carrier": o.get("carrier"),
         "trackingNumber": o.get("trackingNumber"),
-        "estimatedDelivery": _iso(o.get("estimatedDelivery")),
+        "estimatedDelivery": _local_date(o.get("estimatedDelivery")),
     }
 
 
@@ -131,13 +175,17 @@ def _order_detail(o: dict[str, Any]) -> dict[str, Any]:
     detail.update(
         {
             "statusHistory": [
-                {"status": h.get("status"), "at": _iso(h.get("at"))}
+                {
+                    "status": h.get("status"),
+                    "statusLabel": STATUS_LABELS.get(h.get("status"), h.get("status")),
+                    "at": _local_datetime(h.get("at")),
+                }
                 for h in o.get("statusHistory") or []
             ],
             "items": [
                 {
                     "name": i.get("name"),
-                    "options": i.get("options", {}),
+                    "options": _ordered_options(i.get("options")),
                     "unitPrice": i.get("unitPrice"),
                     "quantity": i.get("quantity"),
                 }
