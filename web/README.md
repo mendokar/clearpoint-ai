@@ -71,7 +71,8 @@ web/
 │       └── catalog/images/route.ts    # GET estático (build): fotos de public/images para el selector
 ├── components/
 │   ├── admin/       # RequireAdmin, AdminNavLink, AdminNav, ProductsAdmin, ProductForm (+ productFormModel),
-│   │                # ProductEditor, OrdersAdmin, OrderAdminDetail, AdminSummary, useAdminStatus
+│   │                # ImageUploader (subida a Storage), ProductEditor, OrdersAdmin, OrderAdminDetail,
+│   │                # AdminSummary, useAdminStatus
 │   ├── auth/        # AuthProvider (contexto, Google, correo), AuthForm, RequireAuth
 │   ├── cart/        # CartView, CartDrawer (mini-carrito lateral), useCheckout
 │   ├── chat/        # ChatWidget, ChatMarkdown (render seguro), ChatContext
@@ -82,7 +83,8 @@ web/
 │   └── ui/          # Notice, Spinner, Skeleton, Toaster, AnimatedPrice, Icons, RevealObserver
 ├── emails/                       # React Email: OrderConfirmation, NewOrderAlert (tienda), OrderStatusUpdate
 ├── lib/
-│   ├── admin/       # auth.ts (requireAdmin), products.ts, orders.ts, errors.ts (server-only) y client.ts (navegador)
+│   ├── admin/       # auth.ts (requireAdmin), products.ts, productImages.ts (borrado en Storage), orders.ts,
+│   │                # errors.ts (server-only); client.ts e imageUpload.ts (validación, compresión, subida) en navegador
 │   ├── catalog/     # Esquemas Zod (lectura y admin-schema.ts), generador de variantes, repositorio, hosts de imagen
 │   ├── cart/        # Store de Zustand y estado del mini-carrito (drawer.ts)
 │   ├── motion/      # Hooks de movimiento: tween numérico, foco atrapado, prefers-reduced-motion
@@ -312,12 +314,46 @@ en el menú de cuenta de la cabecera.
   crear porque es el ID), nombre, descripción corta y larga, imágenes, opciones (Medida/Núcleo/Funda u otras, hasta 6),
   detalles de opciones (filas clave/valor por valor; los números se guardan como números: la tabla de núcleos usa
   `alturaCm`, `capas`, `garantiaAnos`…), características, variantes y activo.
-- **Imágenes**: selector con las fotos de `public/images` (lista generada en el build por `/api/catalog/images`),
-  ordenables (la primera es la principal). También se admite una ruta `/images/…` o una URL `https://` de
-  `images.unsplash.com`, `firebasestorage.googleapis.com` o `storage.googleapis.com` (`lib/catalog/image-hosts.ts`,
-  también en `images.remotePatterns`; pasan por `/_next/image`, así que la CSP no cambia). Firebase Storage no está
-  configurado en el proyecto: **subir ficheros desde el panel es una mejora pendiente**; hoy se copian a
-  `public/images` y se despliega.
+- **Imágenes**: tres fuentes que se combinan en una lista ordenable con ↑/↓ (la primera es la principal):
+  1. **Subir fotos** a Firebase Storage (ver abajo).
+  2. Selector con las fotos de `public/images` (lista generada en el build por `/api/catalog/images`).
+  3. Una ruta `/images/…` o una URL `https://` de `images.unsplash.com` o de **nuestro** bucket de Storage
+     (`firebasestorage.googleapis.com/v0/b/<bucket>/o/products%2F…` o `storage.googleapis.com/<bucket>/products/…`).
+     `lib/catalog/image-hosts.ts` fija el bucket (`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` o, si falta,
+     `clearpoint-colchones.firebasestorage.app`); URLs de otros buckets se rechazan en el formulario y en la API.
+     Las mismas rutas están en `images.remotePatterns` (pasan por `/_next/image`).
+
+### Subida de fotos (Firebase Storage)
+
+Las fotos se suben **directamente desde el navegador** a `gs://clearpoint-colchones.firebasestorage.app` con el SDK
+(`uploadBytesResumable` + `getDownloadURL`), así no pasan por las funciones de Vercel ni por su límite de cuerpo. La
+protección son las **reglas de Storage** ([`firebase/storage.rules`](../firebase/README.md#reglas-de-storage)): solo
+la cuenta `admin@contoso.example` con email verificado y `admin: true` en el token, solo en `products/<slug>/`,
+menos de 5 MB y JPEG/PNG/WebP/AVIF. El email está fijado en las reglas: si cambia `ADMIN_EMAILS`, hay que editarlas
+y redesplegarlas.
+
+- En el formulario: zona de **arrastrar y soltar** y botón **Subir fotos** (varias a la vez). Componente
+  `components/admin/ImageUploader.tsx`; lógica en `lib/admin/imageUpload.ts`.
+- **Validación previa** (mensajes en español): tipo JPEG, PNG, WebP o AVIF; hasta 20 MB al elegir (se comprime
+  después) y **menos de 5 MB lo que se sube**; máximo 12 imágenes por producto.
+- **Compresión en el navegador** con `createImageBitmap` + canvas: WebP, lado mayor ≤ **1600 px**, calidad **0,82**.
+  Si el navegador no puede (no decodifica el formato, sin codificador WebP…) se sube el original si cumple los
+  límites; si ya era pequeño y comprimir no lo mejora, también.
+- Nombre: `products/<slug>/<timestamp>-<aleatorio>.webp` (con la extensión del original si se sube sin comprimir),
+  con `Cache-Control: public, max-age=31536000, immutable`.
+- Por fichero: vista previa local (`blob:`), barra de progreso, **Cancelar** y error con **Descartar**. Al terminar,
+  la URL de descarga se añade al final de la lista de imágenes; hay que **guardar** el producto para que quede en
+  Firestore.
+- **Productos nuevos**: hace falta un slug válido antes de subir (las fotos van a su carpeta). En cuanto hay una foto
+  subida, el slug se bloquea; para cambiarlo hay que quitar esas fotos.
+- Sin `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` el botón se oculta con un aviso (biblioteca y URLs siguen funcionando).
+- **Limpieza**: al **eliminar un producto** (`DELETE /api/admin/products/[slug]`) el servidor borra con el Admin SDK
+  todo `products/<slug>/` (`getStorage().bucket().deleteFiles({prefix})`). Si Storage falla, el producto se borra igual,
+  el fallo se registra (`[admin] no se pudieron borrar las fotos de Storage`) y el panel lo indica. **Quitar una foto
+  del formulario no borra el fichero**, porque podría seguir referenciada hasta guardar (ver Limitaciones).
+- Para que el token del navegador lleve el claim basta con recargar `/admin` tras dar el rol (la guarda pide un token
+  nuevo). Un error `storage/unauthorized` suele ser falta de rol, otra cuenta o email sin verificar, o reglas sin
+  desplegar.
 - **Variantes**: "Generar combinaciones" crea una variante por combinación de opciones con un SKU legible
   (`CAF-150190-BRISA-ALGODO`, prefijo editable) y el precio base; conserva las existentes con su precio y stock, y
   avisa de las que ya no encajan para quitarlas. Tabla editable de SKU, precio (acepta coma decimal) y stock, y ajuste
@@ -362,7 +398,7 @@ Todas exigen `Authorization: Bearer <ID token>`, responden `Cache-Control: no-st
 | `GET /api/admin/products/[slug]` | — | 200 `{product}` · 404 |
 | `PUT /api/admin/products/[slug]` | Producto completo; `slug` igual al de la URL | 200 · 400 (también si cambia el slug) · 404 · 409 SKU |
 | `PATCH /api/admin/products/[slug]` | `{active: boolean}` | 200 · 400 · 404 |
-| `DELETE /api/admin/products/[slug]` | — | 200 · 404 |
+| `DELETE /api/admin/products/[slug]` | — (borra también `products/<slug>/` en Storage) | 200 `{ok, slug, images: "deleted" \| "failed"}` · 404 |
 | `GET /api/admin/orders` | `?status=&cursor=&limit=1–50&orderNumber=CP-000123` | 200 `{orders, nextCursor}` · 400 |
 | `GET /api/admin/orders/[id]` | — (marca `reviewedAt` la primera vez) | 200 `{order}` · 404 |
 | `PATCH /api/admin/orders/[id]` | `{status, carrier?, trackingNumber?, estimatedDelivery?, notifyCustomer?}` | 200 `{order, email}` · 400 · 404 · 409 transición inválida |
@@ -380,6 +416,9 @@ Todas exigen `Authorization: Bearer <ID token>`, responden `Cache-Control: no-st
   `/login?next=…`, sin claim a `/`. Los datos solo llegan por la API.
 - Las **reglas de Firestore no cambian**: siguen sin permitir escrituras de cliente y el claim `admin` no da ningún
   acceso extra desde el navegador (hay tests). El panel lee y escribe solo por la API con el Admin SDK.
+- La única excepción es la **subida de fotos a Storage**, que va del navegador al bucket y la protegen las reglas de
+  Storage (claim `admin === true`, email `admin@contoso.example` verificado, carpeta `products/<slug>/`, tamaño y
+  tipo). Probadas con el emulador.
 - `noindex` doble: `robots` en el metadata de `app/admin/layout.tsx` y cabecera `X-Robots-Tag` en `next.config.ts`.
 - Payloads `.strict()` con límites de tamaño; IDs de pedido `cs_…` y slugs validados antes de tocar Firestore;
   URLs de imagen con lista blanca de hosts; sin `confirm()` ni HTML crudo.
@@ -483,9 +522,10 @@ Web Animations API.
   - `script-src 'self' 'unsafe-inline' https://apis.google.com` (+ `'unsafe-eval'` solo en desarrollo).
     `'unsafe-inline'` lo exige la hidratación de Next.js sin nonces; mejora futura: CSP con nonce en middleware.
   - `connect-src 'self'` + `identitytoolkit`, `securetoken`, `firestore`, `www.googleapis.com`,
-    `apis.google.com` y el origen de `NEXT_PUBLIC_AGENT_URL`.
+    `apis.google.com`, `firebasestorage.googleapis.com` (subida de fotos) y el origen de `NEXT_PUBLIC_AGENT_URL`.
   - `frame-src https://accounts.google.com https://*.firebaseapp.com` + el `authDomain` configurado.
-  - `img-src 'self' data: blob: https://lh3.googleusercontent.com` (foto de perfil de Google).
+  - `img-src 'self' data: blob: https://lh3.googleusercontent.com https://firebasestorage.googleapis.com` (foto de
+    perfil de Google, vista previa local `blob:` antes de subir y fotos de Storage).
   - `form-action 'self' https://checkout.stripe.com`. La redirección a Stripe es navegación de nivel
     superior (`window.location`), que la CSP no restringe.
 - **Secretos**: solo en variables de servidor; los módulos que los leen importan `server-only`
@@ -509,6 +549,7 @@ navegar y las funciones que dependen de ellas muestran un aviso controlado.
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Pública | Login, Google | `<proyecto>.firebaseapp.com`; también se añade a la CSP |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Pública | Login, pedidos | ID del proyecto |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Pública | Login, pedidos | ID de la app web |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Pública | Subir fotos en el panel | `clearpoint-colchones.firebasestorage.app` (sin `gs://`). Sin ella se oculta la subida; también fija el bucket que aceptan las URLs de imagen y el que limpia el servidor (si falta, el del proyecto) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Pública | — | `pk_test_…`. Reservada: Checkout alojado no la necesita en el cliente |
 | `NEXT_PUBLIC_AGENT_URL` | Pública | Asistente | URL del agente sin barra final; se añade a `connect-src` |
 | `NEXT_PUBLIC_SITE_URL` | Pública | Pago, emails | URL pública (`success_url`, `cancel_url`, enlaces del email, `metadataBase`) |
@@ -571,24 +612,27 @@ Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.
 2. **Región de funciones**: `fra1` (Fráncfort) o `cdg1` (París) en *Settings → Functions*.
 3. **Variables**: todas las de la tabla, en *Production* (y *Preview* si se usa). Marcar como *Sensitive*
    `FIREBASE_ADMIN_CREDENTIALS`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y `GMAIL_APP_PASSWORD`.
-   `NEXT_PUBLIC_SITE_URL=https://<app>.vercel.app`. Las `NEXT_PUBLIC_*` se incrustan en el build: tras
-   cambiarlas hay que redeplegar.
+   `NEXT_PUBLIC_SITE_URL=https://<app>.vercel.app` y
+   `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=clearpoint-colchones.firebasestorage.app`. Las `NEXT_PUBLIC_*` se incrustan
+   en el build: tras cambiarlas hay que redeplegar.
 4. **Webhook de Stripe** (modo test): *Developers → Webhooks → Add endpoint*
    `https://<app>.vercel.app/api/webhooks/stripe`, evento `checkout.session.completed`. Copiar su
    *Signing secret* en `STRIPE_WEBHOOK_SECRET` y redeplegar.
 5. **Firebase**: añadir `<app>.vercel.app` a *Authorized domains* y desplegar reglas e índices (incluye el índice
-   `orders (status, createdAt)` del filtro del panel). Dar el rol de administrador con `scripts/set-admin.ts`.
+   `orders (status, createdAt)` del filtro del panel) y las **reglas de Storage**
+   (`cd firebase && npx firebase deploy --only storage --project clearpoint-colchones`). Dar el rol de administrador
+   con `scripts/set-admin.ts`.
 6. **Agente**: incluir `https://<app>.vercel.app` en `ALLOWED_ORIGINS` del agente.
 7. Activar *Deployment Protection* en previews.
 
 ## Tests
 
 ```bash
-npm test                 # 237 tests, sin red ni credenciales reales
+npm test                 # 302 tests, sin red ni credenciales reales
 npm run test:coverage    # informe en coverage/
 ```
 
-firebase-admin, Stripe (excepto la verificación de firma, que usa la librería real con un secreto de prueba),
+firebase-admin (también Storage: `deleteFiles`), el SDK de Firebase Storage del navegador, Stripe (excepto la verificación de firma, que usa la librería real con un secreto de prueba),
 Nodemailer y `fetch` están simulados; Firestore se sustituye por un doble en memoria con transacciones
 serializadas, consultas (`where`, `orderBy`, `startAfter`, `limit`, `count`) y fallos simulados
 (`tests/helpers/fakeFirestore.ts`).
@@ -602,16 +646,18 @@ serializadas, consultas (`where`, `orderBy`, `startAfter`, `limit`, `count`) y f
 | Carrito | `tests/unit/cart.test.ts` | Añadir, fusionar misma variante, cambiar cantidad, límites 1–10, eliminar, vaciar, total sin errores de coma flotante, persistencia y rehidratación |
 | Cliente SSE | `tests/unit/chat-client.test.ts` | Los 5 eventos (incluido `replace`); eventos troceados byte a byte; CRLF; JSON roto; `Authorization` solo con sesión; últimos 20 mensajes; 400/401/422/429 (`Retry-After`)/500/503, red y sin configurar |
 | Render del chat | `tests/components/chat-markdown.test.tsx`, `chat-widget.test.tsx` | `<script>` y `<img onerror>` no llegan al DOM; `javascript:` neutralizado; markdown normal; widget: tokens en vivo, `replace` sustituye el texto, 401 ofrece login, 429 y `error` muestran el mensaje, contador de 1000 caracteres, HTML del usuario como texto |
-| Cabeceras y entorno | `tests/security/headers-and-env.test.ts` | `next.config` expone CSP, X-Frame-Options, X-Content-Type-Options y Referrer-Policy; orígenes de Firebase/Google/agente en la CSP; `'unsafe-eval'` solo en dev; `.env.example` sin valores; ninguna `NEXT_PUBLIC_` con nombre de secreto (en `.env.example` y en el código); secretos solo en módulos `server-only`/route handlers; clientes solo leen `NEXT_PUBLIC_`; sin `dangerouslySetInnerHTML` |
+| Cabeceras y entorno | `tests/security/headers-and-env.test.ts` | `next.config` expone CSP, X-Frame-Options, X-Content-Type-Options y Referrer-Policy; orígenes de Firebase/Google/agente en la CSP; Storage solo en `connect-src`/`img-src` y `blob:` solo en `img-src`; `'unsafe-eval'` solo en dev; `.env.example` sin valores; ninguna `NEXT_PUBLIC_` con nombre de secreto (en `.env.example` y en el código); secretos solo en módulos `server-only`/route handlers; clientes solo leen `NEXT_PUBLIC_`; sin `dangerouslySetInnerHTML` |
 | Varios | `tests/unit/misc.test.ts` | Mensajes de error de Auth en español; `next` seguro (sin redirecciones abiertas); formato de precios/fechas; `verifyBearer` (cabeceras mal formadas, token rechazado); `EmailSender` (log sin credenciales, Gmail por SMTP seguro con destinatario y remitente correctos, propagación de errores y pedido sin email) |
-| Panel: productos | `tests/api/admin-products.test.ts` | Sin token 401 y sin claim 403 (también `admin: "true"`) en todas las rutas, sin escribir; `checkRevoked`; 503 sin configurar; lista con inactivos e inválidos; crear con `priceFrom`/fechas de servidor y `revalidatePath`; slug duplicado 409; SKU de otro producto 409; SKU repetido 400; 13 payloads inválidos 400 (slug, imágenes `javascript:`/`..`/otro host, campos extra, precios, opciones); PUT conserva `createdAt`, slug inmutable, 404, 409; PATCH `{active}`; DELETE y 404; 500 sin filtrar detalles |
+| Panel: productos | `tests/api/admin-products.test.ts` | Sin token 401 y sin claim 403 (también `admin: "true"`) en todas las rutas, sin escribir; `checkRevoked`; 503 sin configurar; lista con inactivos e inválidos; crear con `priceFrom`/fechas de servidor y `revalidatePath`; slug duplicado 409; SKU de otro producto 409; SKU repetido 400; 13 payloads inválidos 400 (slug, imágenes `javascript:`/`..`/otro host, campos extra, precios, opciones); PUT conserva `createdAt`, slug inmutable, 404, 409; PATCH `{active}`; DELETE y 404; DELETE borra `products/<slug>/` en Storage, un fallo de Storage no impide el borrado (se registra) y 404/slug inválido no tocan Storage; 500 sin filtrar detalles |
 | Panel: pedidos | `tests/api/admin-orders.test.ts` | 401/403 (también el dueño del pedido sin claim); orden por fecha, filtro, paginación con cursor, búsqueda, filtros no válidos; `reviewedAt` idempotente; transiciones válidas e inválidas (8 casos, 409 sin escribir); shipped exige los tres datos y fecha real; email al cliente una sola vez, `notifyCustomer: false`, `already_sent`, fallo de email sin deshacer el estado; resumen (medianoche de Madrid en verano/invierno, facturación sin cancelados) |
 | Panel: lógica | `tests/unit/admin-logic.test.ts` | Ida y vuelta formulario ↔ esquema con el producto semilla; lista blanca de imágenes; duplicados; decimales; generador de variantes (conserva, añade, huérfanas, colisiones de SKU); renombrar opciones/valores; reglas de estado y nombres compartidos con `lib/schemas` |
+| Subida de fotos: lógica | `tests/unit/image-upload.test.ts` | Tipos admitidos y rechazados (SVG, GIF, HEIC…), vacío, 20 MB al elegir y < 5 MB al subir; nombre `products/<slug>/<timestamp>-<aleatorio>.webp` y slugs no válidos (`..`, mayúsculas…); escalado a 1600 px; compresión WebP 0,82 (convertToBlob/toBlob) y caídas al original (sin canvas, sin WebP, formato no decodificable, no mejora); original > 5 MB sin compresión → error; mensajes de Storage sin detalles internos; solo URLs del bucket configurado (`gs://` admitido, valores raros ignorados, `..`); `remotePatterns` limitados al bucket |
+| Subida de fotos: componente | `tests/components/image-uploader.test.tsx` | SDK de Storage simulado: sin bucket se oculta con aviso; sin slug válido no sube; ruta y metadatos, vista previa, progreso (45 %), URL añadida al terminar; varias a la vez al soltar; error `storage/unauthorized` en español; Cancelar; validación de tipo/tamaño antes de subir; máximo 12 |
 | Panel: guarda | `tests/components/require-admin.test.tsx` | Sin sesión → login con `next`; sin claim → inicio; con claim → `getIdTokenResult(true)` y panel; enlace visible solo para admins |
 | Emails del panel | `tests/unit/admin-emails.test.ts`, `tests/api/webhook.test.ts` | Aviso a la tienda (destinatario, `GMAIL_USER` por defecto, contenido y enlace al panel, opciones ordenadas); emails de Enviado/Entregado/Cancelado; webhook: aviso una sola vez, su fallo no bloquea el pedido ni el email al cliente |
 | Catálogo en Firestore | `tests/unit/catalog-firestore.test.ts` | Sin fallback al JSON: cero productos → `[]`, borrado → `null`, fallo → `CatalogUnavailableError`; solo activos; checkout con precio de Firestore, inactivo 400, sin stock 409 |
 
-Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README.md`](../firebase/README.md).
+Las reglas de Firestore y de Storage se prueban aparte con los emuladores: ver [`firebase/README.md`](../firebase/README.md).
 
 ## Solución de problemas
 
@@ -636,9 +682,15 @@ Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README
   (Baleares/Canarias). Mejora: crear la sesión en dos pasos o validar en el webhook.
 - CSP con `'unsafe-inline'` en scripts (limitación de Next.js sin nonces).
 - Las guardas de ruta son de cliente; la protección de datos está en las reglas de Firestore y en la API.
-- Panel: sin subida de imágenes (Firebase Storage no configurado), sin historial de cambios de productos ni
-  roles más finos que `admin`, sin reembolsos desde el panel y sin edición de pedidos más allá del estado. El
-  selector de imágenes se genera en el build (una foto nueva en `public/images` exige redeplegar).
+- Panel: sin historial de cambios de productos ni roles más finos que `admin`, sin reembolsos desde el panel y sin
+  edición de pedidos más allá del estado. El selector de `public/images` se genera en el build (una foto nueva ahí
+  exige redeplegar; para eso está la subida a Storage).
+- **Fotos huérfanas en Storage**: solo se borran al eliminar el producto. Quedan ficheros sin usar si se quita una foto
+  del formulario, si se sube a un producto nuevo y no se llega a crear, o si falla la limpieza al eliminar. No hay
+  limpieza automática; se pueden borrar a mano en *Storage* (o con un script futuro que compare `products/*/` con
+  las URLs guardadas en Firestore).
+- Las fotos se comprimen en el navegador del administrador; en navegadores sin codificador WebP se sube el original
+  (si pesa menos de 5 MB). No se generan varios tamaños: `next/image` ya los sirve optimizados.
 - Borrar un producto es definitivo (no hay papelera); desactivarlo es la opción reversible.
 - Sin gestión de stock real (`inStock` es un dato del catálogo) ni cálculo de impuestos por región.
 - Las opiniones de la home y las fichas son de ejemplo y están marcadas como tales.

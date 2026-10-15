@@ -48,6 +48,24 @@ describe("cabeceras de seguridad (next.config)", () => {
     expect(csp).not.toMatch(/(script|connect|default)-src [^;]*\*(?!\.)/); // sin comodines sueltos
   });
 
+  it("la CSP permite subir y mostrar fotos de Firebase Storage sin abrir nada más", () => {
+    const csp = buildCsp({ dev: false });
+    const directive = (name: string) => csp.split("; ").find((d) => d.startsWith(`${name} `)) ?? "";
+    expect(directive("connect-src")).toContain("https://firebasestorage.googleapis.com");
+    expect(directive("img-src")).toContain("https://firebasestorage.googleapis.com");
+    expect(directive("img-src")).toContain("blob:"); // vista previa local antes de subir
+    // blob: y Storage solo donde hacen falta
+    for (const d of ["default-src", "script-src", "connect-src", "frame-src", "object-src"]) {
+      expect(directive(d), d).not.toContain("blob:");
+    }
+    for (const d of ["default-src", "script-src", "frame-src", "form-action"]) {
+      expect(directive(d), d).not.toContain("firebasestorage");
+    }
+    expect(directive("img-src")).not.toMatch(/(^| )(https:|\*|http:)( |$)/); // sin esquemas o comodines abiertos
+    expect(directive("connect-src")).not.toMatch(/(^| )(https:|\*|http:)( |$)/);
+    expect(directive("connect-src")).not.toContain("storage.googleapis.com ");
+  });
+
   it("'unsafe-eval' solo en desarrollo", () => {
     expect(buildCsp({ dev: true })).toContain("'unsafe-eval'");
     expect(buildCsp({ dev: false })).not.toContain("'unsafe-eval'");
@@ -86,6 +104,8 @@ describe("variables de entorno", () => {
       if (name.startsWith("NEXT_PUBLIC_")) expect(name).not.toMatch(SECRET_HINTS);
     }
     for (const s of SERVER_SECRETS) expect(lines.map((l) => l.split("=")[0])).toContain(s);
+    // El bucket de Storage es configuración pública (las reglas de Storage son la protección).
+    expect(lines).toContain("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=");
   });
 
   it("el código no usa ninguna NEXT_PUBLIC_ con nombre de secreto", () => {

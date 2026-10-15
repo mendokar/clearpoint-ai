@@ -86,11 +86,11 @@ Todas se ejecutan sin red ni credenciales reales: los servicios externos están 
 
 | Suite | Comando | Pruebas | Estado a 15/10/2026 |
 |---|---|---|---|
-| Web (Vitest) | `cd web && npm test` | 240 | ✅ Todas pasan |
+| Web (Vitest) | `cd web && npm test` | 305 | ✅ Todas pasan |
 | Asistente (pytest) | `cd agent && .venv/bin/python -m pytest --cov=app` | 138 | ✅ Todas pasan |
-| Reglas de Firestore (emulador) | `cd firebase && npm run test:rules` | 13 | ✅ Todas pasan. Requiere Java 21 en `JAVA_HOME` |
-| Scripts (node:test) | `cd scripts && npm test` | 8 | ✅ Todas pasan |
-| **Total** | | **399** | |
+| Reglas de Firestore y Storage (emulador) | `cd firebase && npm run test:rules` | 32 | ✅ Todas pasan. Requiere Java 21 en `JAVA_HOME` |
+| Scripts (node:test) | `cd scripts && npm test` | 10 | ✅ Todas pasan |
+| **Total** | | **485** | |
 
 ### Web
 
@@ -248,6 +248,10 @@ Requiere una cuenta con el rol de administrador.
 | CP-ADM-11 | Completar el paso a Enviado y preguntar al asistente por el pedido | El cliente recibe el email de envío y el asistente da el estado nuevo con el seguimiento | A |
 | CP-ADM-12 | Cambiar un estado con la casilla de notificar desmarcada | El estado cambia y no se envía email | B |
 | CP-ADM-13 | Revisar el resumen de `/admin` tras una compra | Suben los pedidos y la facturación de hoy | B |
+| CP-ADM-14 | Con admin, subir dos fotos arrastrándolas al formulario de un colchón y guardar | Se ve el progreso, se comprimen y aparecen en la ficha de la tienda | A |
+| CP-ADM-15 | Intentar subir un PDF o una imagen de más de 20 MB | El panel lo rechaza con un mensaje claro | M |
+| CP-ADM-16 | Iniciar sesión con demo1 y abrir `/admin` o llamar a `/api/admin/summary` | Vuelve a la home y la API responde 403 | A |
+| CP-ADM-17 | Registrar una cuenta nueva con una contraseña de 5 caracteres | Se rechaza con el mensaje de 8 caracteres mínimo | M |
 
 ### 5.9 Seguridad
 

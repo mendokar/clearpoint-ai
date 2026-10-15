@@ -2,7 +2,9 @@
 const MESSAGES: Record<string, string> = {
   "auth/invalid-email": "El correo no tiene un formato válido.",
   "auth/missing-password": "Escribe tu contraseña.",
-  "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
+  "auth/weak-password": "La contraseña debe tener al menos 8 caracteres.",
+  // Política de contraseñas del servidor de Firebase (mínimo 8 caracteres), por si se salta la web.
+  "auth/password-does-not-meet-requirements": "La contraseña debe tener al menos 8 caracteres.",
   "auth/email-already-in-use": "Ya existe una cuenta con ese correo. Inicia sesión.",
   "auth/invalid-credential": "Correo o contraseña incorrectos.",
   "auth/wrong-password": "Correo o contraseña incorrectos.",

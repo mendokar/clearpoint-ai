@@ -39,14 +39,14 @@ describe("parseArgs", () => {
 describe("setAdmin", () => {
   it("asigna el claim conservando los demás", async () => {
     const { auth, calls } = fakeAuth({ "ana@example.com": { uid: "u1", customClaims: { plan: "pro" } } });
-    assert.deepEqual(await setAdmin(auth, "ana@example.com", false), { uid: "u1", status: "granted" });
+    assert.deepEqual(await setAdmin(auth, "ana@example.com", false, ["ana@example.com"]), { uid: "u1", status: "granted" });
     assert.deepEqual(calls.setClaims, [["u1", { plan: "pro", admin: true }]]);
     assert.deepEqual(calls.revoked, []);
   });
 
   it("es idempotente: si ya es admin no escribe", async () => {
     const { auth, calls } = fakeAuth({ "ana@example.com": { uid: "u1", customClaims: { admin: true } } });
-    assert.equal((await setAdmin(auth, "ana@example.com", false)).status, "unchanged");
+    assert.equal((await setAdmin(auth, "ana@example.com", false, ["ana@example.com"])).status, "unchanged");
     assert.equal(calls.setClaims.length, 0);
   });
 
@@ -72,6 +72,19 @@ describe("setAdmin", () => {
 
   it("usuario inexistente → error explicativo", async () => {
     const { auth } = fakeAuth({});
-    await assert.rejects(setAdmin(auth, "nadie@example.com", false), /No existe ningún usuario/);
+    await assert.rejects(setAdmin(auth, "nadie@example.com", false, ["nadie@example.com"]), /No existe ningún usuario/);
+  });
+
+  it("no concede el rol a correos fuera de la lista permitida (por defecto solo admin@contoso.example)", async () => {
+    const { auth, calls } = fakeAuth({ "ana@example.com": { uid: "u1", customClaims: {} } });
+    await assert.rejects(setAdmin(auth, "ana@example.com", false), /no está en la lista de administradores/);
+    await assert.rejects(setAdmin(auth, "ana@example.com", false, ["admin@contoso.example"]), /no está en la lista/);
+    assert.equal(calls.setClaims.length, 0);
+  });
+
+  it("quitar el rol funciona aunque el correo no esté en la lista", async () => {
+    const { auth, calls } = fakeAuth({ "ana@example.com": { uid: "u1", customClaims: { admin: true } } });
+    assert.equal((await setAdmin(auth, "ana@example.com", true)).status, "revoked");
+    assert.deepEqual(calls.revoked, ["u1"]);
   });
 });

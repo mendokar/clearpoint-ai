@@ -60,7 +60,7 @@ beforeEach(() => {
   db.store.set("orders/cs_test_deli01", order(4, "delivered", "2026-10-12T09:00:00Z"));
   db.store.set("orders/cs_test_canc01", order(5, "cancelled", "2026-10-11T09:00:00Z"));
   verifyBearer.mockImplementation(async (h: string | null) => {
-    if (h === "Bearer admin-token") return { uid: "admin-1", admin: true };
+    if (h === "Bearer admin-token") return { uid: "admin-1", email: "admin@contoso.example", email_verified: true, admin: true };
     if (h === "Bearer user-token") return { uid: "alice" };
     return null;
   });
