@@ -7,7 +7,8 @@ import {
   setProductActive,
   updateProduct,
 } from "@/lib/admin/products";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { deleteProductImages } from "@/lib/admin/productImages";
+import { getAdminBucket, getAdminDb } from "@/lib/firebase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,7 +75,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 }
 
-/** DELETE /api/admin/products/[slug] — elimina el documento. Los pedidos ya hechos conservan sus datos. */
+/**
+ * DELETE /api/admin/products/[slug] — elimina el documento y, después, sus fotos de Storage (`products/<slug>/`).
+ * Si Storage falla el producto queda borrado igual (`images: "failed"`, registrado). Los pedidos ya hechos
+ * conservan sus datos.
+ */
 export async function DELETE(req: Request, ctx: Ctx) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
@@ -84,7 +89,8 @@ export async function DELETE(req: Request, ctx: Ctx) {
     await deleteProduct(getAdminDb(), slug);
     revalidateCatalog(slug);
     console.info("[admin] producto eliminado", { slug, by: auth.user.uid });
-    return jsonResponse(200, { ok: true, slug });
+    const images = await deleteProductImages(getAdminBucket, slug);
+    return jsonResponse(200, { ok: true, slug, images });
   } catch (err) {
     return handleAdminError("eliminar producto", err);
   }

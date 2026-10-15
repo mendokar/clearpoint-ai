@@ -47,6 +47,7 @@ Contoso es una tienda online de colchones de adulto con identidad colombiana: ta
 | Asistente IA (FastAPI + LangGraph) | [`agent/`](agent/README.md) | ✅ Desplegado en Cloud Run y probado con Anthropic y con el respaldo de OpenAI |
 | Web (Next.js): interfaz, carrito, auth, checkout, webhook | [`web/`](web/README.md) | ✅ Hecho en local: build, lint y typecheck limpios. Falta la prueba de extremo a extremo con credenciales |
 | Reglas e índices de Firestore | [`firebase/`](firebase/README.md) | ✅ Hecho y probado en el emulador. Falta desplegarlas |
+| Reglas de Storage (fotos de producto del panel) | [`firebase/`](firebase/README.md#reglas-de-storage) | ✅ Probadas en el emulador. Falta desplegarlas (`firebase deploy --only storage`) |
 | Scripts de seed y de estados de pedido | [`scripts/`](scripts/README.md) | ✅ Probados contra los emuladores |
 | Pruebas unitarias y de seguridad | `agent/tests`, `web/tests`, `firebase/tests` | ✅ 241 pruebas en verde |
 | Proyecto Firebase con reglas, índices y datos de demo | `firebase/`, `scripts/` | ✅ Activo y verificado |
@@ -89,7 +90,7 @@ clearpoint-ai/
 ├── web/            Tienda Next.js (interfaz, carrito, auth, checkout, webhook)  → web/README.md
 ├── agent/          Asistente IA en Python (FastAPI + LangGraph)                 → agent/README.md
 ├── data/           Catálogo, política de envíos y pedidos demo (fuente única)   → data/README.md
-├── firebase/       Reglas, índices y tests de reglas de Firestore               → firebase/README.md
+├── firebase/       Reglas de Firestore y Storage, índices y sus tests           → firebase/README.md
 ├── scripts/        Seed de datos y avance de estados de pedido                  → scripts/README.md
 ├── webbase/        Páginas de referencia de Clearpoint (solo consulta local, excluida de Git)
 ├── docs/           Memoria técnica
@@ -169,7 +170,7 @@ El plan completo para QA, con los casos manuales de extremo a extremo, está en 
 |---|---|---|
 | Asistente | `cd agent && pytest --cov` | Aislamiento entre usuarios, token inválido, prompt injection, límites, fallback y nodos del grafo |
 | Web | `cd web && npm test` | Checkout, webhook, idempotencia, carrito, configurador, cliente SSE y cabeceras de seguridad |
-| Reglas Firestore | `cd firebase && npm run test:rules` | Lectura propia permitida, ajena denegada y escrituras de cliente bloqueadas. Requiere Java 21 (`JAVA_HOME`) |
+| Reglas Firestore y Storage | `cd firebase && npm run test:rules` | Lectura propia permitida, ajena denegada y escrituras de cliente bloqueadas; fotos de producto: solo admin@contoso.example (verificado y con claim admin) sube (< 5 MB, JPEG/PNG/WebP/AVIF), lectura pública. Requiere Java 21 (`JAVA_HOME`) |
 
 Última ejecución:
 
@@ -189,8 +190,9 @@ Los datos se cargan con `scripts/seed.ts` desde la carpeta [`data/`](data/README
 |---|---|---|
 | `demo1@contoso.example` | `Tolima-Siesta-4732` | 3 pedidos: CP-000101 entregado, CP-000118 enviado con seguimiento y CP-000123 pagado |
 | `demo2@contoso.example` | `Caribe-Panela-1348` | 1 pedido: CP-000120 en preparación, a medida y con envío a Baleares |
+| `admin@contoso.example` | Se entrega por un canal privado, nunca en el repositorio | Ninguno. Es la única cuenta que puede entrar al panel en `/admin` |
 
-También se puede crear una cuenta nueva con correo y contraseña o entrar con Google.
+También se puede crear una cuenta nueva con correo y contraseña o entrar con Google. Las cuentas nuevas no son administradoras.
 
 **Pago de prueba:** tarjeta `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC. La tarjeta `4000 0000 0000 0002` simula un pago rechazado.
 
@@ -218,6 +220,7 @@ cd scripts && npx tsx --env-file=.env update-order-status.ts CP-000123 shipped
 | Proyecto | `clearpoint-colchones` |
 | Authentication | Correo y contraseña y Google activados. Dominios autorizados: `localhost`, los de Firebase y `clearpoint-ai.vercel.app` |
 | Firestore | Base de datos `(default)` en modo nativo |
+| Storage | Bucket `clearpoint-colchones.firebasestorage.app` (europe-southwest1) para las fotos de producto. Reglas en `firebase/storage.rules` |
 | Reglas e índices | Desplegados desde `firebase/` |
 | Datos de demo | Cargados con el seed |
 
@@ -268,6 +271,10 @@ Resumen. El detalle está en la sección 8 de [`ARQUITECTURA.md`](ARQUITECTURA.m
 - El asistente es de solo lectura, también a nivel de permisos de infraestructura.
 - Las reglas de Firestore impiden leer pedidos ajenos y cualquier escritura desde el navegador.
 - Hay cabeceras de seguridad, CORS restringido y límites de uso del asistente.
+- El panel de administración solo admite a `admin@contoso.example`. Se exigen a la vez el rol `admin` de Firebase, el correo verificado y que el correo esté en `ADMIN_EMAILS`. Se comprueba en el servidor en cada petición, en las reglas de Storage y en el script que concede el rol.
+- La contraseña de administrador no está en el repositorio. Las de los clientes de demo solo dan acceso a pedidos de prueba.
+- Firebase exige contraseñas de al menos 8 caracteres también en el servidor y tiene activada la protección contra la enumeración de correos.
+- Las fotos se suben directamente a Firebase Storage. Solo el administrador puede subir o borrar, con un máximo de 5 MB y solo imágenes JPG, PNG, WebP o AVIF dentro de `products/`.
 
 ---
 
@@ -292,7 +299,7 @@ Resumen. El detalle está en la sección 8 de [`ARQUITECTURA.md`](ARQUITECTURA.m
 Se irán ampliando. Las actuales son estas:
 
 - El límite de mensajes del asistente vive en memoria y no se comparte entre instancias.
-- El panel no sube imágenes, porque Firebase Storage no está activado. Las fotos se añaden a `web/public/images` o desde Unsplash.
+- Las fotos subidas desde el panel solo se borran de Storage al eliminar el producto. Quitar una foto del formulario no borra el fichero, así que pueden quedar huérfanos (también si se sube una foto a un producto nuevo y no se guarda).
 - Cancelar un pedido en el panel no hace el reembolso en Stripe.
 - No hay gestión real de stock ni de impuestos por región.
 - El email de confirmación sale de una cuenta de Gmail. Tiene un límite diario de unos 500 envíos y puede acabar en spam. Los usuarios demo tienen correos ficticios, así que para ver el email hay que comprar con una cuenta real o con Google.

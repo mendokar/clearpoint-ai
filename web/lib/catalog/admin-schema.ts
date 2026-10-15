@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ALLOWED_IMAGE_HOSTS } from "./image-hosts";
+import { ALLOWED_IMAGE_HOSTS, isAllowedStoragePath, storageBucketName } from "./image-hosts";
 
 /**
  * Esquema de entrada del panel de administración para `products/{slug}`.
@@ -25,7 +25,8 @@ export function isAllowedImageUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password && !url.port &&
-      (ALLOWED_IMAGE_HOSTS as readonly string[]).includes(url.hostname);
+      (ALLOWED_IMAGE_HOSTS as readonly string[]).includes(url.hostname) &&
+      isAllowedStoragePath(url.hostname, url.pathname) && !url.pathname.includes("..");
   } catch {
     return false;
   }
@@ -35,7 +36,7 @@ const imageSchema = z
   .string()
   .trim()
   .refine(isAllowedImageUrl, {
-    message: `Usa una imagen de /images/… o una URL https de: ${ALLOWED_IMAGE_HOSTS.join(", ")}.`,
+    message: `Usa una imagen de /images/…, una URL https de images.unsplash.com o una foto de Firebase Storage del bucket ${storageBucketName()}.`,
   });
 
 const text = (max: number, label: string) => z.string().trim().max(max, `${label}: máximo ${max} caracteres.`);

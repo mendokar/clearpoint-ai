@@ -10,8 +10,10 @@ import {
   adminProductSchema,
   fieldErrors,
   isAllowedImageUrl,
+  slugSchema,
   type AdminVariant,
 } from "@/lib/catalog/admin-schema";
+import { ImageUploader } from "./ImageUploader";
 import { generateVariants, skuPrefixFromSlug } from "@/lib/catalog/variants";
 import { formatPrice } from "@/lib/format";
 import {
@@ -84,6 +86,12 @@ export function ProductForm({ mode, initial }: Props) {
     }
   }
 
+  const slugValid = slugSchema.safeParse(f.slug).success;
+  // En un producto nuevo, las fotos subidas viven en products/<slug>/: el slug se bloquea mientras haya alguna.
+  const hasUploads = f.images.some(isUploadedImage);
+  const addImage = (url: string) =>
+    setF((s) => (s.images.includes(url) ? s : { ...s, images: [...s.images, url] }));
+
   const messages = useMemo(() => Object.entries(errors).map(([path, msg]) => `${labelFor(path, f)}: ${msg}`), [errors, f]);
 
   return (
@@ -119,9 +127,15 @@ export function ProductForm({ mode, initial }: Props) {
             onChange={(v) => set("slug", v.toLowerCase())}
             error={err("slug")}
             required
-            readOnly={mode === "edit"}
+            readOnly={mode === "edit" || hasUploads}
             maxLength={80}
-            hint={mode === "edit" ? "El slug es el ID del producto y no se puede cambiar." : `Se verá en /productos/${f.slug || "mi-colchon"}. Solo minúsculas, números y guiones.`}
+            hint={
+              mode === "edit"
+                ? "El slug es el ID del producto y no se puede cambiar."
+                : hasUploads
+                  ? "Hay fotos subidas en la carpeta de este slug: quítalas para cambiarlo."
+                  : `Se verá en /productos/${f.slug || "mi-colchon"}. Solo minúsculas, números y guiones.`
+            }
             mono
           />
         </div>
@@ -174,7 +188,14 @@ export function ProductForm({ mode, initial }: Props) {
         </label>
       </Section>
 
-      <ImagesSection images={f.images} onChange={(v) => set("images", v)} error={err("images") ?? firstWithPrefix(errors, "images.")} />
+      <ImagesSection
+        images={f.images}
+        onChange={(v) => set("images", v)}
+        onAdd={addImage}
+        slug={f.slug}
+        slugValid={slugValid}
+        error={err("images") ?? firstWithPrefix(errors, "images.")}
+      />
 
       <Section title="Opciones" description="Lo que el cliente elige en la ficha (p. ej. Medida, Núcleo, Funda).">
         {err("options") && <FieldError>{err("options")}</FieldError>}
@@ -316,7 +337,28 @@ export function ProductForm({ mode, initial }: Props) {
 
 /* ---------- Imágenes ---------- */
 
-function ImagesSection({ images, onChange, error }: { images: string[]; onChange: (v: string[]) => void; error?: string }) {
+const MAX_IMAGES = 12;
+
+/** Foto subida a nuestro Firebase Storage (no de la biblioteca ni de Unsplash). */
+function isUploadedImage(src: string): boolean {
+  return src.startsWith("https://firebasestorage.googleapis.com/") && isAllowedImageUrl(src);
+}
+
+function ImagesSection({
+  images,
+  onChange,
+  onAdd,
+  slug,
+  slugValid,
+  error,
+}: {
+  images: string[];
+  onChange: (v: string[]) => void;
+  onAdd: (url: string) => void;
+  slug: string;
+  slugValid: boolean;
+  error?: string;
+}) {
   const [library, setLibrary] = useState<string[] | null>(null);
   const [libraryError, setLibraryError] = useState(false);
   const [url, setUrl] = useState("");
@@ -345,7 +387,7 @@ function ImagesSection({ images, onChange, error }: { images: string[]; onChange
   const addUrl = () => {
     const v = url.trim();
     if (!isAllowedImageUrl(v)) {
-      setUrlError("Usa una ruta /images/… o una URL https de images.unsplash.com o Firebase Storage.");
+      setUrlError("Usa una ruta /images/…, una URL https de images.unsplash.com o una foto del Firebase Storage de la tienda.");
       return;
     }
     if (images.includes(v)) {
@@ -361,7 +403,7 @@ function ImagesSection({ images, onChange, error }: { images: string[]; onChange
     <Section title="Imágenes" description="La primera es la principal (tarjeta de la home y galería).">
       {error && <FieldError>{error}</FieldError>}
       {images.length === 0 ? (
-        <p className="text-sm text-muted">Sin imágenes. Elige alguna de la biblioteca o añade una URL.</p>
+        <p className="text-sm text-muted">Sin imágenes. Sube fotos, elige alguna de la biblioteca o añade una URL.</p>
       ) : (
         <ol className="m-0 grid list-none gap-2 p-0">
           {images.map((src, i) => (
@@ -373,6 +415,7 @@ function ImagesSection({ images, onChange, error }: { images: string[]; onChange
               )}
               <span className="mono min-w-0 flex-1 text-xs break-all">
                 {i === 0 && <span className="pill !ml-0 mr-2">Principal</span>}
+                {isUploadedImage(src) && <span className="pill !ml-0 mr-2">Subida</span>}
                 {src}
               </span>
               <span className="flex gap-1">
@@ -396,6 +439,15 @@ function ImagesSection({ images, onChange, error }: { images: string[]; onChange
           ))}
         </ol>
       )}
+
+      <div>
+        <p className="label">Subir fotos (Firebase Storage)</p>
+        <ImageUploader slug={slug} slugValid={slugValid} remaining={MAX_IMAGES - images.length} onUploaded={onAdd} />
+        <p className="mt-1 text-xs text-muted">
+          Quitar una foto de la lista no la borra de Storage (podría seguir en uso hasta que guardes). Al eliminar el
+          producto se borran todas las de su carpeta.
+        </p>
+      </div>
 
       <div>
         <p className="label">Biblioteca (web/public/images)</p>
@@ -451,10 +503,6 @@ function ImagesSection({ images, onChange, error }: { images: string[]; onChange
           </button>
         </div>
         {urlError && <FieldError id={`${urlId}-err`}>{urlError}</FieldError>}
-        <p className="mt-1 text-xs text-muted">
-          Para subir fotos nuevas, cópialas en web/public/images y vuelve a desplegar (la subida directa a Firebase Storage es una
-          mejora pendiente).
-        </p>
       </div>
     </Section>
   );

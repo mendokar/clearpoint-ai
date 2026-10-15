@@ -11,6 +11,7 @@ for (const key of [
   "ADMIN_NOTIFICATION_EMAIL",
   "NEXT_PUBLIC_AGENT_URL",
   "NEXT_PUBLIC_SITE_URL",
+  "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
 ]) {
   delete process.env[key];
 }

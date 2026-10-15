@@ -38,11 +38,24 @@ describe("RequireAdmin", () => {
   });
 
   it("con claim admin refresca el token (getIdTokenResult(true)) y muestra el panel", async () => {
-    getIdTokenResult.mockResolvedValue({ claims: { admin: true } });
+    getIdTokenResult.mockResolvedValue({ claims: { admin: true, email: "admin@contoso.example", email_verified: true } });
     render(<RequireAdmin>secreto</RequireAdmin>);
     expect(await screen.findByText("secreto")).toBeTruthy();
     expect(getIdTokenResult).toHaveBeenCalledWith(true);
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("claim admin en otra cuenta o sin correo verificado no entra (solo admin@contoso.example)", async () => {
+    getIdTokenResult.mockResolvedValue({ claims: { admin: true, email: "otro@example.com", email_verified: true } });
+    const { unmount } = render(<RequireAdmin>secreto</RequireAdmin>);
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText("secreto")).toBeNull();
+    unmount();
+    replace.mockClear();
+    getIdTokenResult.mockResolvedValue({ claims: { admin: true, email: "admin@contoso.example", email_verified: false } });
+    render(<RequireAdmin>secreto</RequireAdmin>);
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText("secreto")).toBeNull();
   });
 
   it("claim mal tipado (\"true\" como texto) no cuenta", async () => {
@@ -59,7 +72,7 @@ describe("AdminNavLink", () => {
     await waitFor(() => expect(getIdTokenResult).toHaveBeenCalledWith(false));
     expect(screen.queryByText("Panel de administración")).toBeNull();
     unmount();
-    getIdTokenResult.mockResolvedValue({ claims: { admin: true } });
+    getIdTokenResult.mockResolvedValue({ claims: { admin: true, email: "admin@contoso.example", email_verified: true } });
     render(<AdminNavLink />);
     expect((await screen.findByText("Panel de administración")).getAttribute("href")).toBe("/admin");
   });

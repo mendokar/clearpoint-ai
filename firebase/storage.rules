@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// Reglas de Cloud Storage de Colchones Contoso (bucket clearpoint-colchones.firebasestorage.app).
+// Solo existe una carpeta: las fotos de producto que sube el panel de administración desde el navegador.
+// Todo lo que no casa con un `match` está denegado.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Solo la cuenta de administración de la tienda: custom claim admin === true (puesto por scripts/set-admin.ts;
+    // el texto "true" no vale), email exacto admin@contoso.example y verificado. La misma lista de emails se aplica
+    // en el servidor (ADMIN_EMAILS en la web).
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.get('admin', false) == true
+        && request.auth.token.get('email', '') == 'admin@contoso.example'
+        && request.auth.token.get('email_verified', false) == true;
+    }
+
+    // Mismo formato que SLUG_RE / slugSchema de web/lib/catalog/admin-schema.ts.
+    function isValidSlug(slug) {
+      return slug.size() >= 3 && slug.size() <= 80 && slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$');
+    }
+
+    // <timestamp>-<aleatorio>.<ext> u otro nombre simple, sin rutas ni caracteres raros.
+    function isValidFileName(file) {
+      return file.matches('^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$');
+    }
+
+    // Menos de 5 MB y solo formatos de imagen rasterizados (sin SVG, que puede llevar scripts).
+    function isValidImage() {
+      return request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('^image/(jpeg|png|webp|avif)$');
+    }
+
+    match /products/{slug}/{file} {
+      // Las fotos se ven en la tienda sin sesión. Listar la carpeta, en cambio, solo un admin.
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && isValidSlug(slug) && isValidFileName(file) && isValidImage();
+      // En un borrado no hay request.resource: basta con ser admin y que la ruta sea válida.
+      allow delete: if isAdmin() && isValidSlug(slug);
+    }
+  }
+}

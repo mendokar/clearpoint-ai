@@ -1,15 +1,18 @@
-# firebase — Reglas e índices de Firestore
+# firebase — Reglas de Firestore y Storage, e índices
 
-Configuración de Firestore para Colchones Contoso. No se usan Functions ni Hosting: la web vive en Vercel y
-el agente en Cloud Run. **Toda escritura se hace desde el servidor con el Admin SDK** (que ignora las reglas),
-así que las reglas solo tienen que decidir qué puede **leer** el navegador.
+Configuración de Firestore y Cloud Storage para Colchones Contoso. No se usan Functions ni Hosting: la web vive en
+Vercel y el agente en Cloud Run. En Firestore **toda escritura se hace desde el servidor con el Admin SDK** (que
+ignora las reglas), así que sus reglas solo deciden qué puede **leer** el navegador. La única escritura desde el
+navegador es la **subida de fotos de producto** del panel a Storage, protegida por `storage.rules`.
 
 ```
 firebase/
 ├── firebase.json            # Rutas de reglas/índices y puertos de los emuladores
-├── firestore.rules          # Reglas de seguridad
-├── firestore.indexes.json   # Índice compuesto de orders
-├── tests/firestore.rules.test.ts   # Tests de reglas (@firebase/rules-unit-testing + emulador)
+├── firestore.rules          # Reglas de seguridad de Firestore
+├── firestore.indexes.json   # Índices compuestos de orders
+├── storage.rules            # Reglas de Storage (fotos de producto)
+├── tests/firestore.rules.test.ts   # Tests de reglas de Firestore (@firebase/rules-unit-testing + emulador)
+├── tests/storage.rules.test.ts     # Tests de reglas de Storage (emulador de Storage)
 ├── vitest.config.ts · tsconfig.json
 └── package.json             # firebase-tools, rules-unit-testing, vitest (versiones fijadas)
 ```
@@ -56,6 +59,41 @@ y usa el Admin SDK. Así un admin no tiene más poder desde el navegador que cua
 
 **Todo lo demás está denegado por defecto** (por ejemplo `counters/orders`, el contador de números de pedido).
 
+## Reglas de Storage
+
+Bucket `clearpoint-colchones.firebasestorage.app` (europe-southwest1). El panel sube las fotos **directamente desde
+el navegador** con el SDK (`uploadBytesResumable`), sin pasar por las funciones de Vercel (que limitan el tamaño del
+cuerpo). Por eso aquí, a diferencia de Firestore, el claim `admin` **sí** aparece en las reglas.
+
+```
+match /products/{slug}/{file} {
+  allow get:            if true;
+  allow list:           if isAdmin();
+  allow create, update: if isAdmin() && isValidSlug(slug) && isValidFileName(file) && isValidImage();
+  allow delete:         if isAdmin() && isValidSlug(slug);
+}
+```
+
+- `isAdmin()`: claim `admin == true` (un `"true"` en texto **no** vale) **y** `email == 'admin@contoso.example'`
+  (exacto) **y** `email_verified == true`. Solo esa cuenta puede subir, borrar o listar. Es la misma lista que aplica
+  la web en el servidor (`ADMIN_EMAILS`, por defecto `admin@contoso.example`); las reglas no leen variables, así que
+  **si cambia la cuenta de administración hay que editar `storage.rules` y volver a desplegarlas**.
+- `isValidSlug(slug)`: 3–80 caracteres y `^[a-z0-9]+(-[a-z0-9]+)*$`, el mismo formato que `SLUG_RE` de
+  `web/lib/catalog/admin-schema.ts`.
+- `isValidFileName(file)`: nombre simple (`^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$`). La web usa
+  `<timestamp>-<aleatorio>.webp`.
+- `isValidImage()`: `request.resource.size < 5 MB` y `contentType` `image/jpeg|png|webp|avif`. No se admite SVG,
+  que puede llevar scripts.
+- **Lectura pública** de cada foto (la tienda las muestra sin sesión). **Listar** la carpeta solo puede un admin,
+  para no exponer el contenido del bucket.
+- El borrado no tiene `request.resource`, así que solo exige admin y una ruta válida. La web borra la carpeta
+  `products/<slug>/` en el servidor (Admin SDK, que ignora las reglas) al eliminar un producto.
+- **Todo lo que no sea `products/{slug}/{fichero}` está denegado**, también para un admin (subcarpetas, la raíz y
+  cualquier otra ruta).
+
+El claim llega al token del navegador porque la guarda del panel pide uno nuevo con `getIdTokenResult(true)`. Si se
+acaba de dar el rol, basta con recargar `/admin`.
+
 ## Índices
 
 | Colección | Campos | Para |
@@ -68,22 +106,27 @@ consultas de un solo campo (`createdAt >=`, `status ==`), que no necesitan índi
 
 ## Desplegar
 
-Requisitos: proyecto de Firebase con Firestore (región europea) y la CLI autenticada.
+Requisitos: proyecto de Firebase con Firestore y Storage (región europea) y la CLI autenticada.
 
 ```bash
 cd firebase
 npm ci
 npx firebase login
-npx firebase use --add          # elige el proyecto (crea .firebaserc localmente)
-npx firebase deploy --only firestore:rules,firestore:indexes
-# o: npm run deploy:rules
+npx firebase use --add          # elige el proyecto clearpoint-colchones (crea .firebaserc localmente)
+
+npx firebase deploy --only storage --project clearpoint-colchones                        # reglas de Storage
+npx firebase deploy --only firestore:rules,firestore:indexes --project clearpoint-colchones
+# o todo junto: npm run deploy:rules   ·   solo Storage: npm run deploy:storage
 ```
+
+`"storage": {"rules": "storage.rules"}` se aplica al **bucket por defecto** del proyecto, que es
+`clearpoint-colchones.firebasestorage.app`. Las reglas se pueden revisar después en *Storage → Reglas*.
 
 El índice tarda unos minutos en construirse; su estado se ve en *Firestore → Índices*.
 
 ## Probar con el emulador
 
-Los tests usan `@firebase/rules-unit-testing` contra el emulador de Firestore, que **requiere Java 21+**
+Los tests usan `@firebase/rules-unit-testing` contra los emuladores de Firestore y Storage, que **requieren Java 21+**
 (firebase-tools 14). En esta máquina el Java por defecto es 8, pero hay un JDK 21 en `/usr/lib/jvm`:
 
 ```bash
@@ -94,11 +137,17 @@ export PATH="$JAVA_HOME/bin:$PATH"
 npm run test:rules
 ```
 
-`test:rules` ejecuta `firebase emulators:exec --only firestore --project demo-contoso "vitest run"`: arranca el
-emulador, carga `firestore.rules`, ejecuta los tests y lo apaga. El proyecto `demo-*` no toca ningún proyecto
-real ni necesita credenciales. La primera vez descarga el jar del emulador (~60 MB) en `~/.cache/firebase`.
+`test:rules` ejecuta `firebase emulators:exec --only firestore,storage --project demo-contoso "vitest run"`: arranca
+los emuladores, carga `firestore.rules` y `storage.rules`, ejecuta los tests y los apaga. El proyecto `demo-*` no toca
+ningún proyecto real ni necesita credenciales. La primera vez descarga los jars de los emuladores en
+`~/.cache/firebase`.
 
-Resultado actual: **13 tests en verde**.
+Puertos (`firebase.json`): **Firestore 8181**, **Storage 9199**, **Auth 9099**. El 8080 queda libre para el
+asistente en local (uvicorn).
+
+Resultado actual: **32 tests en verde** (13 de Firestore y 19 de Storage).
+
+### Firestore
 
 | Caso | Esperado |
 |---|---|
@@ -115,8 +164,25 @@ Resultado actual: **13 tests en verde**.
 | Leer o escribir `counters/orders` | Denegado |
 | Con claim `admin`: escribir productos/pedidos, leer pedidos ajenos o listarlos | Denegado (el panel va por la API) |
 
-Si el puerto 8080 está ocupado por otro proceso, ejecuta con una copia de `firebase.json` (fuera del repo) con otros
-puertos: `npx firebase emulators:exec --config /ruta/firebase.json --only firestore --project demo-contoso "npx vitest run"`.
+### Storage
+
+| Caso | Esperado |
+|---|---|
+| `admin@contoso.example` (verificado, con claim) sube WebP, JPEG, PNG y AVIF válidos a `products/<slug>/` | Permitido |
+| Usuario normal, anónimo o claim `admin: "true"` (texto) sube | Denegado |
+| Claim `admin: true` con otro email, o `admin@contoso.example` sin email verificado | Denegado |
+| `admin@contoso.example` verificado sin claim, o email con otras mayúsculas | Denegado |
+| Fichero de 5 MB o más (y justo por debajo) | Denegado (permitido) |
+| SVG, GIF, HTML u `application/octet-stream` | Denegado |
+| Slug con mayúsculas, `_`, demasiado corto/largo o con guion inicial | Denegado |
+| Subir fuera de `products/{slug}/{fichero}` (otra carpeta, raíz, subcarpeta) | Denegado |
+| Leer una foto de producto sin sesión o como usuario | Permitido |
+| Leer fuera de `products/` (también admin) | Denegado |
+| Listar la carpeta de un producto: anónimo / usuario / admin | Denegado / Denegado / Permitido |
+| Borrar: admin / usuario, anónimo, claim en texto, otro email o sin verificar / fuera de `products/` | Permitido / Denegado / Denegado |
+
+Si algún puerto está ocupado por otro proceso, ejecuta con una copia de `firebase.json` (fuera del repo) con otros
+puertos: `npx firebase emulators:exec --config /ruta/firebase.json --only firestore,storage --project demo-contoso "npx vitest run"`.
 
 Los mensajes `PERMISSION_DENIED` que aparecen en la salida son los intentos que los tests esperan que fallen.
 

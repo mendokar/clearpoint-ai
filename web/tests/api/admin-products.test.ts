@@ -4,12 +4,14 @@ import { FakeFirestore } from "../helpers/fakeFirestore";
 
 const verifyBearer = vi.fn();
 const revalidatePath = vi.fn();
+const deleteFiles = vi.fn();
 let db: FakeFirestore;
 let configured = true;
 
 vi.mock("@/lib/firebase/admin", () => ({
   isAdminConfigured: () => configured,
   getAdminDb: () => db,
+  getAdminBucket: () => ({ name: "clearpoint-colchones.firebasestorage.app", deleteFiles }),
   verifyBearer: (h: string | null, opts?: unknown) => verifyBearer(h, opts),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
@@ -46,8 +48,13 @@ beforeEach(() => {
   db = new FakeFirestore();
   // Producto existente sembrado (como hace scripts/seed.ts)
   db.store.set("products/colchon-cafetal", { ...structuredClone(raw.products[0]), updatedAt: new Date(0) });
+  deleteFiles.mockReset();
+  deleteFiles.mockResolvedValue(undefined);
   verifyBearer.mockImplementation(async (h: string | null) => {
-    if (h === "Bearer admin-token") return { uid: "admin-1", email: "admin@contoso.example", admin: true };
+    if (h === "Bearer admin-token") return { uid: "admin-1", email: "admin@contoso.example", email_verified: true, admin: true };
+    // Claim admin válido pero otra cuenta: solo admin@contoso.example puede administrar.
+    if (h === "Bearer other-admin") return { uid: "admin-2", email: "otro@example.com", email_verified: true, admin: true };
+    if (h === "Bearer unverified-admin") return { uid: "admin-3", email: "admin@contoso.example", email_verified: false, admin: true };
     if (h === "Bearer user-token") return { uid: "user-1", email: "ana@example.com" };
     if (h === "Bearer fake-claim") return { uid: "user-2", admin: "true" }; // claim mal tipado no vale
     return null;
@@ -76,7 +83,11 @@ describe("autorización de /api/admin/products", () => {
   ])("%s con usuario sin claim admin → 403 y no escribe", async (_n, call) => {
     expect((await call("user-token")).status).toBe(403);
     expect((await call("fake-claim")).status).toBe(403);
+    // Seguridad: con claim admin pero otra cuenta, o sin correo verificado, tampoco entra.
+    expect((await call("other-admin")).status).toBe(403);
+    expect((await call("unverified-admin")).status).toBe(403);
     expect(db.writes).toHaveLength(0);
+    expect(deleteFiles).not.toHaveBeenCalled();
   });
 
   it("token inválido → 401", async () => {
@@ -226,6 +237,43 @@ describe("editar, activar y borrar", () => {
     expect(db.store.has("products/colchon-cafetal")).toBe(false);
     expect(revalidatePath).toHaveBeenCalledWith("/");
     expect((await item.DELETE(req("DELETE"), ctx("colchon-cafetal"))).status).toBe(404);
+  });
+
+  it("DELETE borra también las fotos de Storage de products/<slug>/ (y solo esa carpeta)", async () => {
+    const res = await item.DELETE(req("DELETE"), ctx("colchon-cafetal"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, slug: "colchon-cafetal", images: "deleted" });
+    expect(deleteFiles).toHaveBeenCalledTimes(1);
+    expect(deleteFiles).toHaveBeenCalledWith({ prefix: "products/colchon-cafetal/", force: true });
+  });
+
+  it("si Storage falla, el producto se borra igual y el fallo se registra", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    deleteFiles.mockRejectedValue(new Error("storage caído"));
+    const res = await item.DELETE(req("DELETE"), ctx("colchon-cafetal"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).images).toBe("failed");
+    expect(db.store.has("products/colchon-cafetal")).toBe(false);
+    expect(error).toHaveBeenCalledWith(
+      "[admin] no se pudieron borrar las fotos de Storage",
+      expect.objectContaining({ slug: "colchon-cafetal", error: "storage caído" }),
+    );
+  });
+
+  it("si el bucket no se puede obtener (excepción síncrona), el producto se borra igual", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    deleteFiles.mockImplementation(() => {
+      throw new Error("sin bucket");
+    });
+    const res = await item.DELETE(req("DELETE"), ctx("colchon-cafetal"));
+    expect(res.status).toBe(200);
+    expect(db.store.has("products/colchon-cafetal")).toBe(false);
+  });
+
+  it("DELETE de un producto inexistente o con slug inválido no toca Storage", async () => {
+    expect((await item.DELETE(req("DELETE"), ctx("no-existe"))).status).toBe(404);
+    expect((await item.DELETE(req("DELETE"), ctx("..%2F..%2Fsecret"))).status).toBe(400);
+    expect(deleteFiles).not.toHaveBeenCalled();
   });
 
   it("error inesperado de Firestore → 500 genérico sin filtrar detalles", async () => {

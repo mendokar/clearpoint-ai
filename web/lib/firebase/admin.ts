@@ -2,6 +2,8 @@ import "server-only";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { storageBucketName } from "../catalog/image-hosts";
 
 /**
  * Firebase Admin (solo servidor). Credencial en FIREBASE_ADMIN_CREDENTIALS como
@@ -33,12 +35,17 @@ export function getAdminApp(): App {
   if (app) return app;
   const raw = process.env.FIREBASE_ADMIN_CREDENTIALS;
   if (!raw) throw new AdminNotConfiguredError();
-  app = getApps()[0] ?? initializeApp({ credential: cert(parseCredentials(raw)) });
+  app = getApps()[0] ?? initializeApp({ credential: cert(parseCredentials(raw)), storageBucket: storageBucketName() });
   return app;
 }
 
 export function getAdminDb(): Firestore {
   return getFirestore(getAdminApp());
+}
+
+/** Bucket de las fotos de producto (`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` o el del proyecto). */
+export function getAdminBucket() {
+  return getStorage(getAdminApp()).bucket(storageBucketName());
 }
 
 export function getAdminAuth() {

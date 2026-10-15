@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --project demo-contoso \"vitest run\"",
-    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-contoso \"vitest run\"",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
+    "deploy:storage": "firebase deploy --only storage"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "4.0.1",

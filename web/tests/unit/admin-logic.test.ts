@@ -37,7 +37,12 @@ describe("esquema de administración", () => {
   it.each([
     ["/images/colchon-cafetal-1.jpg", true],
     ["https://images.unsplash.com/photo-1?w=1200", true],
-    ["https://firebasestorage.googleapis.com/v0/b/x/o/y.jpg", true],
+    ["https://firebasestorage.googleapis.com/v0/b/clearpoint-colchones.firebasestorage.app/o/products%2Fcolchon-cafetal%2F1-a.webp?alt=media&token=t", true],
+    ["https://firebasestorage.googleapis.com/v0/b/otro-bucket.appspot.com/o/products%2Fx%2Fy.jpg?alt=media", false],
+    ["https://firebasestorage.googleapis.com/v0/b/clearpoint-colchones.firebasestorage.app/o/private%2Fy.jpg", false],
+    ["https://firebasestorage.googleapis.com/v0/b/x/o/y.jpg", false],
+    ["https://storage.googleapis.com/clearpoint-colchones.firebasestorage.app/products/colchon-cafetal/1-a.webp", true],
+    ["https://storage.googleapis.com/otro-bucket/products/x.jpg", false],
     ["http://images.unsplash.com/x.jpg", false],
     ["https://evil.example/x.jpg", false],
     ["https://user:pw@images.unsplash.com/x.jpg", false],

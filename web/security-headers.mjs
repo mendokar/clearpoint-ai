@@ -14,6 +14,8 @@ function originOf(url) {
  * - Next.js (scripts inline de hidratación → 'unsafe-inline'; 'unsafe-eval' solo en desarrollo).
  * - Stripe Checkout: se navega a checkout.stripe.com (navegación de nivel superior, no la limita CSP).
  * - Firebase Auth/Firestore y el popup/redirect de Google.
+ * - Firebase Storage: el panel sube fotos desde el navegador (connect-src) y las muestra (img-src); la vista
+ *   previa local antes de subir usa URLs blob: (img-src).
  * - El asistente (NEXT_PUBLIC_AGENT_URL).
  */
 export function buildCsp({ agentUrl, authDomain, dev = false } = {}) {
@@ -25,12 +27,13 @@ export function buildCsp({ agentUrl, authDomain, dev = false } = {}) {
     "https://firestore.googleapis.com",
     "https://www.googleapis.com",
     "https://apis.google.com",
+    "https://firebasestorage.googleapis.com",
   ];
   const directives = {
     "default-src": ["'self'"],
     "script-src": ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : []), "https://apis.google.com"],
     "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "data:", "blob:", "https://lh3.googleusercontent.com"],
+    "img-src": ["'self'", "data:", "blob:", "https://lh3.googleusercontent.com", "https://firebasestorage.googleapis.com"],
     "font-src": ["'self'", "data:"],
     "connect-src": ["'self'", ...firebaseConnect, ...(agent ? [agent] : []), ...(dev ? ["ws:", "http://localhost:*"] : [])],
     "frame-src": ["https://accounts.google.com", "https://*.firebaseapp.com", ...(auth ? [auth] : [])],
