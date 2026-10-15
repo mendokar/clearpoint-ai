@@ -1,0 +1,441 @@
+# web — Tienda Colchones Contoso (Next.js)
+
+Tienda online de **Colchones Contoso**, marca colombiana (taller en Envigado, algodón del Tolima) que vende
+colchones de adulto en España, en euros. Esta carpeta contiene la web completa y su API de tienda: catálogo,
+configurador de producto, carrito, registro e inicio de sesión (correo o Google), pago con Stripe Checkout en
+modo test, webhook que crea el pedido, email de confirmación, "Mis pedidos" y el widget del asistente IA,
+que habla con el agente Python de [`agent/`](../agent/README.md).
+
+## Qué hace
+
+- **Home** con los dos colchones (Cafetal y Caribe), comparativa de núcleos, prueba de 30 noches, taller,
+  opiniones de ejemplo y presentación del asistente.
+- **Fichas de producto** con configurador de Medida, Núcleo y Funda: solo deja elegir combinaciones que existen,
+  marca las agotadas y actualiza precio y SKU al instante.
+- **Carrito** persistido en el navegador, con contador en la cabecera.
+- **Cuenta**: registro e inicio de sesión con correo y contraseña o con Google (Firebase Auth).
+- **Pago**: `/api/checkout` recalcula los precios en el servidor y crea una Stripe Checkout Session. El pedido
+  se crea **solo** desde el webhook firmado de Stripe y se envía un email de confirmación con Resend.
+- **Mis pedidos**: listado y detalle con línea de estados, transportista y seguimiento, leídos directamente de
+  Firestore con el SDK de cliente, protegidos por las reglas de seguridad.
+- **Asistente**: panel flotante con streaming SSE, indicador de consulta de herramientas y render seguro.
+
+## Stack
+
+| Tecnología | Versión | Uso |
+|---|---|---|
+| Next.js (App Router) + React | 15.5 / 19.1 | Páginas, SSR/ISR y route handlers |
+| TypeScript (estricto) | 5 | Todo el código |
+| Tailwind CSS | 4 | Estilos, a partir de los tokens del diseño en `app/globals.css` |
+| Zustand (persist) | 5 | Carrito en `localStorage` |
+| Zod | 3.25 | Validación en cliente y en las API routes |
+| Firebase JS SDK | 11 | Auth en el cliente y lectura de pedidos |
+| firebase-admin | 13 | Verificación de ID tokens, escritura de pedidos y perfiles, lectura del catálogo |
+| stripe (Node) | 18 (API `2025-08-27.basil`) | Checkout Sessions y verificación del webhook |
+| Resend + React Email | 6 / 0.5 | Email de confirmación |
+| react-markdown + remark-gfm | 10 / 4 | Política de envíos y respuestas del asistente, sin HTML crudo |
+| Vitest + Testing Library | 3.2 / 16 | Tests unitarios, de API y de componentes |
+
+No se usa shadcn/ui: los pocos componentes interactivos (panel del chat, menú de cuenta, chips del
+configurador) son propios y no compensaba añadir Radix.
+
+## Estructura de carpetas
+
+```
+web/
+├── app/
+│   ├── layout.tsx                 # Fuentes (next/font), cabecera, pie, proveedores y ChatWidget
+│   ├── globals.css                # Tokens del diseño (claro/oscuro) expuestos a Tailwind
+│   ├── page.tsx                   # Home
+│   ├── productos/[slug]/page.tsx  # Ficha con galería y configurador (SSG + ISR 5 min)
+│   ├── carrito/page.tsx
+│   ├── login/page.tsx · registro/page.tsx
+│   ├── pedidos/page.tsx · pedidos/[id]/page.tsx   # Protegidas (guarda en cliente + reglas)
+│   ├── checkout/exito/page.tsx    # "Procesando…" y espera a que el webhook cree el pedido
+│   ├── checkout/cancelado/page.tsx
+│   ├── envios-y-devoluciones/page.tsx  # Renderiza data/shipping_policy.md (o Firestore)
+│   ├── not-found.tsx
+│   └── api/
+│       ├── checkout/route.ts          # POST: crea la Checkout Session
+│       ├── webhooks/stripe/route.ts   # POST: crea el pedido (idempotente) y envía el email
+│       └── users/me/route.ts          # POST: upsert del perfil users/{uid}
+├── components/
+│   ├── auth/        # AuthProvider (contexto, Google, correo), AuthForm, RequireAuth
+│   ├── cart/        # CartView
+│   ├── chat/        # ChatWidget, ChatMarkdown (render seguro), ChatContext
+│   ├── home/        # ProductCard, Benefits, Reviews (opiniones demo)
+│   ├── layout/      # SiteHeader (mini-carrito y cuenta), SiteFooter, Logo
+│   ├── orders/      # OrdersList, OrderDetail, CheckoutSuccess, OrderStatus
+│   ├── product/     # ProductConfigurator, ProductGallery, CoresTable, selection.ts (lógica pura)
+│   └── ui/          # Notice, Spinner
+├── emails/OrderConfirmation.tsx   # Plantilla React Email
+├── lib/
+│   ├── catalog/     # Esquema Zod del catálogo y repositorio (Firestore o data/catalog.json)
+│   ├── cart/        # Store de Zustand
+│   ├── chat/client.ts   # ÚNICO módulo que conoce el contrato SSE del agente
+│   ├── email/       # Interfaz EmailSender + implementación Resend
+│   ├── firebase/    # admin.ts (server-only) y client.ts (navegador)
+│   ├── orders/      # fulfill.ts (creación del pedido), tipos y lectura en cliente
+│   ├── checkout.ts  # Recalcula precios y construye los parámetros de Stripe
+│   ├── schemas.ts   # Esquemas Zod (checkout, login, registro, IDs)
+│   └── stripe.ts    # Cliente Stripe (server-only) y tarifas de envío
+├── security-headers.mjs  # CSP y cabeceras (las usa next.config.ts y los tests)
+├── next.config.ts
+├── public/images/        # Fotos (Unsplash) y nombres que usa data/catalog.json
+├── tests/                # Vitest (ver "Tests")
+└── .env.example
+```
+
+Datos compartidos con el agente (solo lectura desde aquí): `../data/catalog.json`,
+`../data/shipping_policy.md` y `../data/demo_orders.json`. El catálogo y la política se empaquetan en el
+build (import estático), así que funcionan igual en local y en Vercel.
+
+## Rutas y páginas
+
+| Ruta | Tipo | Acceso | Descripción |
+|---|---|---|---|
+| `/` | Estática + ISR (5 min) | Público | Home (port del diseño aprobado) |
+| `/productos/colchon-cafetal`, `/productos/colchon-caribe` | SSG + ISR | Público | Ficha con configurador, tabla de núcleos, fundas, envío, opiniones demo y recomendado |
+| `/carrito` | Cliente | Público (pagar exige sesión) | Líneas, cantidades, total estimado y botón de pago |
+| `/login`, `/registro` | Cliente | Público | Google arriba, separador "o con tu correo" y formulario |
+| `/pedidos` | Cliente | Sesión | Mis pedidos (Firestore, `userId == uid`, `createdAt desc`) |
+| `/pedidos/[id]` | Cliente | Sesión + dueño | Detalle; si no es tuyo, las reglas lo deniegan y se muestra "no encontrado" |
+| `/checkout/exito?session_id=…` | Cliente | Sesión | Consulta cada 2 s (máx. ~1 min) hasta que el webhook haya creado el pedido. **No crea nada** |
+| `/checkout/cancelado` | Estática | Público | Pago cancelado; el carrito se conserva |
+| `/envios-y-devoluciones` | ISR | Público | Política en markdown (Firestore `content/shipping_policy` o `data/shipping_policy.md`) |
+
+## API routes
+
+Todas responden JSON con `Cache-Control: no-store`, usan runtime Node.js y devuelven mensajes genéricos en
+español (el detalle solo va a los logs). Si faltan credenciales responden **503** controlado.
+
+### `POST /api/checkout`
+
+| | |
+|---|---|
+| Cabecera | `Authorization: Bearer <Firebase ID token>` (obligatoria) |
+| Cuerpo | `{ "items": [{ "sku": "CAF-150190-CEI-TER", "quantity": 2 }] }` — esquema `.strict()`: cualquier campo extra (`price`, `uid`…) → 400 |
+| Límites | 1–20 líneas, cantidad entera 1–10 por SKU (también sumando líneas repetidas), SKU `^[A-Z0-9-]{3,40}$` |
+| 200 | `{ "url": "https://checkout.stripe.com/…" }` |
+| Errores | 400 carrito no válido o SKU inexistente · 401 sin sesión/token inválido · 409 variante agotada · 502 fallo de Stripe · 503 sin configurar |
+
+En el servidor: verifica el token con firebase-admin, valida con Zod, **recalcula los precios desde el
+catálogo** (Firestore o JSON), y crea la sesión con `mode=payment`, EUR, `locale=es`,
+`shipping_address_collection.allowed_countries=["ES"]`, tres tarifas de envío según la política
+(península gratis, Baleares 45 €, Canarias/Ceuta/Melilla 89 €), `metadata.uid`, `client_reference_id = uid`,
+`payment_intent_data.metadata.uid`, `customer_email` del token y, por línea, `product_data.metadata`
+`{sku, slug, options}`.
+
+### `POST /api/webhooks/stripe`
+
+| | |
+|---|---|
+| Cabecera | `stripe-signature` (verificada con `STRIPE_WEBHOOK_SECRET` sobre el cuerpo crudo) |
+| Eventos | Solo `checkout.session.completed` con `payment_status = "paid"`; el resto → 200 `{received, ignored}` |
+| 200 | `{ "received": true, "result": "created" \| "duplicate" }` |
+| Errores | 400 firma ausente o inválida (no se escribe nada) · 500 fallo al guardar (Stripe reintenta) · 503 sin configurar |
+
+Crea `orders/{session.id}` en **una transacción** que lee el pedido (si existe, no hace nada) y el contador
+`counters/orders`, y escribe ambos: así un evento repetido o concurrente no duplica el pedido ni consume
+número. `orderNumber` = `CP-` + 6 dígitos. Los ítems e importes salen de Stripe
+(`listLineItems` con `expand: data.price.product`), la dirección de `collected_information.shipping_details`,
+y `statusHistory` empieza con `paid`. Después envía el email; si falla, se registra y el pedido queda guardado.
+
+### `POST /api/users/me`
+
+| | |
+|---|---|
+| Cabecera | `Authorization: Bearer <Firebase ID token>` |
+| Cuerpo | Ninguno (se ignora): todo sale del token verificado |
+| 200 | `{ "ok": true }` |
+| Errores | 401 sin token o inválido · 503 sin configurar |
+
+Hace upsert de `users/{uid}` con `email`, `displayName`, `photoURL` (solo `https://`), `provider`
+(`password` o `google.com`), `updatedAt` y `createdAt` (solo la primera vez). Se llama tras el registro con
+correo y tras cada acceso con Google. Existe porque las reglas no permiten escribir `users` desde el cliente.
+
+## Flujo de compra
+
+```mermaid
+sequenceDiagram
+    participant U as Navegador
+    participant W as Next.js (/api)
+    participant S as Stripe
+    participant F as Firestore
+    participant R as Resend
+
+    U->>W: POST /api/checkout {items:[{sku,quantity}]} + Bearer ID token
+    W->>W: verifyIdToken → uid · Zod .strict()
+    W->>F: Precios del catálogo (o data/catalog.json)
+    W->>S: checkout.sessions.create (EUR, ES, metadata.uid)
+    W-->>U: {url}
+    U->>S: Paga con 4242 4242 4242 4242
+    S->>W: checkout.session.completed (firmado)
+    W->>W: constructEvent (firma) · payment_status = paid
+    W->>S: listLineItems
+    W->>F: Transacción: orders/{sessionId} + counters/orders
+    W->>R: Email de confirmación (si falla, solo log)
+    S-->>U: Redirección a /checkout/exito?session_id=…
+    U->>F: getDoc(orders/{sessionId}) cada 2 s (reglas: solo el dueño)
+```
+
+## Autenticación
+
+- `components/auth/AuthProvider.tsx` expone `user`, `loading`, `getToken()` (el SDK renueva el ID token antes de
+  que caduque; se escucha `onIdTokenChanged`), `signInWithEmail`, `registerWithEmail`, `signInWithGoogle` y
+  `signOut`.
+- **Google**: `signInWithPopup(GoogleAuthProvider)`; si el navegador bloquea el popup
+  (`auth/popup-blocked`, `operation-not-supported-in-this-environment`, `web-storage-unsupported`) se pasa a
+  `signInWithRedirect` y al volver se procesa `getRedirectResult`.
+- Errores en español (`lib/auth/errors.ts`): cerrar el popup no muestra nada alarmante;
+  `auth/account-exists-with-different-credential` explica que ese correo ya tiene contraseña; dominio no
+  autorizado; red; demasiados intentos; credenciales incorrectas (sin revelar si el correo existe).
+- Tras el registro con correo o el acceso con Google se llama a `POST /api/users/me`.
+- La cabecera muestra la foto de Google (o la inicial del nombre) en el botón de cuenta, con menú para ir a
+  "Mis pedidos" o cerrar sesión.
+- `RequireAuth` es una guarda **de cliente** (redirige a `/login?next=…`); la protección real de los datos son
+  las reglas de Firestore. `next` se valida para evitar redirecciones abiertas.
+
+### Pasos manuales en Firebase Console
+
+1. **Authentication → Sign-in method**: habilitar *Correo electrónico/contraseña* y *Google* (elegir el email
+   de asistencia del proyecto).
+2. **Authentication → Settings → Authorized domains**: añadir el dominio de Vercel (`<app>.vercel.app` y el
+   dominio propio si lo hay). `localhost` ya viene autorizado.
+3. **Configuración del proyecto → Tus apps → App web**: copiar `apiKey`, `authDomain`, `projectId` y `appId`
+   a las variables `NEXT_PUBLIC_FIREBASE_*`.
+4. **Cuentas de servicio → Generar nueva clave privada**: codificarla en base64 y guardarla como
+   `FIREBASE_ADMIN_CREDENTIALS` (nunca en el repositorio).
+5. Desplegar reglas e índices (ver [`firebase/README.md`](../firebase/README.md)).
+
+> El acceso por redirección (`signInWithRedirect`) depende del almacenamiento de terceros. En navegadores que lo
+> bloquean (Safari, Chrome con particionado) puede no completarse si `authDomain` es `*.firebaseapp.com` y la web
+> está en otro dominio. El flujo principal es el popup, que funciona en todos ellos; la solución completa del
+> redirect es servir `/__/auth/*` desde el propio dominio (fuera del alcance de esta prueba).
+
+## Carrito
+
+- `lib/cart/store.ts`: Zustand con `persist` en `localStorage` (clave `contoso-cart`). Cada línea guarda
+  `sku`, `slug`, `name`, `options`, `unitPrice`, `image` y `quantity`.
+- Añadir la misma variante suma cantidades; la cantidad se acota a 1–10 por línea.
+- El precio guardado es **solo informativo**: al pagar solo se envían `sku` y `quantity` y el servidor
+  recalcula todo.
+- Se vacía al volver de Stripe a `/checkout/exito` con un `session_id` válido. Si el pago se cancela se conserva.
+- `useHydrated` evita desajustes de hidratación al leer el carrito persistido.
+
+## Integración con el asistente
+
+- Cliente: **`lib/chat/client.ts`** (único módulo que conoce el contrato) y UI en `components/chat/ChatWidget.tsx`.
+- Petición: `POST ${NEXT_PUBLIC_AGENT_URL}/chat` con `{"messages":[{"role":"user"|"assistant","content":"…"}]}`
+  (últimos 20 mensajes, sin vacíos, respuestas del asistente recortadas a 4000 caracteres) y
+  `Authorization: Bearer <ID token>` solo si hay sesión.
+- Respuesta SSE `event: <tipo>\ndata: <json>\n\n`, leída con `fetch` + `ReadableStream` (tolera eventos partidos
+  entre chunks, también caracteres UTF-8 partidos):
+
+| Evento | Datos | Qué hace el widget |
+|---|---|---|
+| `token` | `{text}` | Concatena el texto en la burbuja del turno |
+| `tool_start` | `{name}` | Muestra "Buscando tus pedidos…", "Consultando el catálogo…", etc. |
+| `replace` | `{text}` | Sustituye **todo** el texto del turno (filtro de salida del agente) |
+| `done` | `{provider}` | Fin del turno |
+| `error` | `{code, message}` | Muestra `message`; el turno termina sin `done` |
+
+- Errores HTTP previos al stream (`{"error":{"code","message"}}`): 401 → "Tu sesión ha caducado" con enlace a
+  iniciar sesión; 429 → mensaje del agente (lee `Retry-After`); 400/422 → mensaje de validación; 5xx → "no
+  disponible"; error de red → "No hemos podido conectar".
+- El input limita a 1000 caracteres con contador; Enter envía y Mayús+Enter hace salto de línea; se puede parar
+  la respuesta.
+- Render con `react-markdown` y `skipHtml` (ni `<script>` ni `<img onerror>` llegan al DOM), imágenes
+  desactivadas y enlaces externos con `rel="noopener noreferrer nofollow"`. Los mensajes del usuario se
+  pintan como texto.
+- Responsive: panel de 400 px abajo a la derecha en escritorio, pantalla completa en móvil; Escape lo cierra y
+  el foco vuelve al botón flotante.
+- Contrato completo y códigos: [`agent/README.md`](../agent/README.md#contrato-de-chat-y-eventos-sse).
+
+## Diseño
+
+- Basado en el diseño de home aprobado: cabecera fija con barra superior, hero partido con foto en arco, franja
+  wayuu como único gesto gráfico, botón flotante "¿Te ayudo?".
+- **Tokens** (variables CSS en `app/globals.css`, con modo oscuro por `prefers-color-scheme` y
+  `data-theme`), expuestos a Tailwind como `bg-bg`, `bg-surface`, `bg-tint`, `text-ink`, `text-muted`,
+  `border-line`, `bg-aji`, `text-aji-ink`, `bg-panela`, `text-guayaba`, `text-on-accent`:
+
+| Token | Claro | Oscuro | Uso |
+|---|---|---|---|
+| `--bg` arena | `#F7EEE4` | `#1B120D` | Fondo |
+| `--surface` | `#FFFAF4` | `#251912` | Tarjetas |
+| `--tint` panela clara | `#EFDDCB` | `#33231A` | Bloques destacados |
+| `--ink` café tostado | `#2C1B12` | `#F6E9DB` | Texto |
+| `--muted` | `#6E5546` | `#C2A894` | Texto secundario |
+| `--line` | `#E2CDBA` | `#3F2C20` | Bordes |
+| `--aji` naranja ají | `#D9542B` | `#F07043` | Acento principal, botones |
+| `--aji-ink` | `#B8431F` | `#F4855D` | Ají para texto pequeño (contraste AA sobre arena) |
+| `--panela` | `#C4862C` | `#E0A54A` | Foco, sellos, estrellas |
+| `--guayaba` | `#C9566A` | `#E57A8C` | Uso puntual |
+
+- **Tipografías** con `next/font/google` (autoalojadas, sin peticiones a Google en tiempo de ejecución):
+  Bricolage Grotesque (display), Figtree (cuerpo) y DM Mono (datos, precios, SKU).
+- **Fotos** (Unsplash), con el crédito visible junto a cada una: hero — Matthieu Lemarchal; textura — Costa
+  Live; taller — Roberto Nickson; Cafetal — Deconovo; Caribe — Nathan Van Egmond.
+  Los nombres `colchon-*-1/2.jpg` son los que referencia `data/catalog.json`.
+- Accesibilidad: enlace "Saltar al contenido", foco visible (`outline` panela), chips del configurador como
+  radios nativos con `fieldset`/`legend`, `aria-live` en precio y chat, textos alternativos, respeto de
+  `prefers-reduced-motion`.
+
+## Seguridad
+
+- **Cabeceras** (`security-headers.mjs`, aplicadas a todas las rutas): `Content-Security-Policy`,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` (necesario para el popup de
+  Google) y `Strict-Transport-Security` en producción.
+- **CSP**:
+  - `default-src 'self'`, `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`.
+  - `script-src 'self' 'unsafe-inline' https://apis.google.com` (+ `'unsafe-eval'` solo en desarrollo).
+    `'unsafe-inline'` lo exige la hidratación de Next.js sin nonces; mejora futura: CSP con nonce en middleware.
+  - `connect-src 'self'` + `identitytoolkit`, `securetoken`, `firestore`, `www.googleapis.com`,
+    `apis.google.com` y el origen de `NEXT_PUBLIC_AGENT_URL`.
+  - `frame-src https://accounts.google.com https://*.firebaseapp.com` + el `authDomain` configurado.
+  - `img-src 'self' data: blob: https://lh3.googleusercontent.com` (foto de perfil de Google).
+  - `form-action 'self' https://checkout.stripe.com`. La redirección a Stripe es navegación de nivel
+    superior (`window.location`), que la CSP no restringe.
+- **Secretos**: solo en variables de servidor; los módulos que los leen importan `server-only`
+  (`lib/firebase/admin.ts`, `lib/stripe.ts`, `lib/email/resend.ts`, `lib/catalog/repository.ts`,
+  `lib/content.ts`) o son route handlers. Un test recorre el código y falla si un componente cliente lee una
+  variable sin `NEXT_PUBLIC_` o si una `NEXT_PUBLIC_` tiene nombre de secreto.
+- **`NEXT_PUBLIC_` es la frontera**: solo la configuración web de Firebase, la clave publicable de Stripe y
+  las URLs públicas.
+- Precios recalculados en servidor, pedidos solo desde el webhook firmado, `uid` siempre del token verificado,
+  esquemas Zod `.strict()`, IDs de pedido validados (`cs_…`), sin `dangerouslySetInnerHTML`, errores genéricos
+  al usuario y logs sin tokens ni datos de tarjeta.
+
+## Variables de entorno
+
+Copiar `.env.example` a `.env.local`. Ninguna es obligatoria para **arrancar**: sin ellas la tienda se puede
+navegar y las funciones que dependen de ellas muestran un aviso controlado.
+
+| Variable | Tipo | Obligatoria para | Descripción |
+|---|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Pública | Login, pedidos | Config web de Firebase |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Pública | Login, Google | `<proyecto>.firebaseapp.com`; también se añade a la CSP |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Pública | Login, pedidos | ID del proyecto |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Pública | Login, pedidos | ID de la app web |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Pública | — | `pk_test_…`. Reservada: Checkout alojado no la necesita en el cliente |
+| `NEXT_PUBLIC_AGENT_URL` | Pública | Asistente | URL del agente sin barra final; se añade a `connect-src` |
+| `NEXT_PUBLIC_SITE_URL` | Pública | Pago, emails | URL pública (`success_url`, `cancel_url`, enlaces del email, `metadataBase`) |
+| `FIREBASE_ADMIN_CREDENTIALS` | **Secreta** | Pago, webhook, `/api/users/me`, catálogo en Firestore | JSON de cuenta de servicio en base64 (o JSON plano) |
+| `STRIPE_SECRET_KEY` | **Secreta** | Pago, webhook | `sk_test_…` (o *restricted key* con Checkout Sessions) |
+| `STRIPE_WEBHOOK_SECRET` | **Secreta** | Webhook | `whsec_…` del endpoint o de `stripe listen` |
+| `RESEND_API_KEY` | **Secreta** | Email | Sin ella el email solo se registra en logs |
+| `EMAIL_FROM` | Secreta (config) | Email | Remitente, p. ej. `Contoso <onboarding@resend.dev>` |
+
+## Ejecutar en local
+
+Requisitos: Node 20+ y npm.
+
+```bash
+cd web
+npm ci
+cp .env.example .env.local      # opcional: rellena lo que tengas
+npm run dev                     # http://localhost:3000
+```
+
+Otros comandos:
+
+```bash
+npm run build && npm start      # build de producción
+npm run lint                    # ESLint (next/core-web-vitals + typescript)
+npm run typecheck               # tsc --noEmit
+npm test                        # Vitest
+npm run test:coverage           # Vitest + cobertura (coverage/index.html)
+```
+
+Sin credenciales: home, fichas, carrito, envíos y login responden 200; el catálogo sale de
+`data/catalog.json`; `/api/checkout`, `/api/webhooks/stripe` y `/api/users/me` devuelven 503 con mensaje; el
+login muestra "Inicio de sesión no disponible"; el asistente avisa de que falta `NEXT_PUBLIC_AGENT_URL`.
+
+Para datos demo (productos, política, usuarios y pedidos) ver [`scripts/README.md`](../scripts/README.md).
+
+## Probar pagos
+
+1. Rellena `FIREBASE_ADMIN_CREDENTIALS`, `STRIPE_SECRET_KEY` y las `NEXT_PUBLIC_FIREBASE_*`.
+2. En otra terminal, con la [Stripe CLI](https://docs.stripe.com/stripe-cli):
+
+   ```bash
+   stripe login
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
+   ```
+
+   Copia el `whsec_…` que imprime en `STRIPE_WEBHOOK_SECRET` y reinicia `npm run dev`.
+3. Inicia sesión, añade un colchón, pulsa **Pagar con tarjeta** y usa `4242 4242 4242 4242`, cualquier fecha
+   futura, cualquier CVC y una dirección española.
+4. Vuelves a `/checkout/exito`, que muestra "Procesando tu pedido…" hasta que el webhook lo crea, y luego el
+   número `CP-000xxx`. El pedido aparece en "Mis pedidos" y llega el email (ver limitación de Resend).
+5. Reenviar el mismo evento (`stripe events resend evt_…`) no duplica el pedido.
+
+## Despliegue en Vercel
+
+1. Importar el repositorio en Vercel con **Root Directory = `web`** (framework Next.js detectado). Dejar
+   activada la opción de incluir archivos fuera del Root Directory: el build importa `../data/*`.
+2. **Región de funciones**: `fra1` (Fráncfort) o `cdg1` (París) en *Settings → Functions*.
+3. **Variables**: todas las de la tabla, en *Production* (y *Preview* si se usa). Marcar como *Sensitive*
+   `FIREBASE_ADMIN_CREDENTIALS`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y `RESEND_API_KEY`.
+   `NEXT_PUBLIC_SITE_URL=https://<app>.vercel.app`. Las `NEXT_PUBLIC_*` se incrustan en el build: tras
+   cambiarlas hay que redeplegar.
+4. **Webhook de Stripe** (modo test): *Developers → Webhooks → Add endpoint*
+   `https://<app>.vercel.app/api/webhooks/stripe`, evento `checkout.session.completed`. Copiar su
+   *Signing secret* en `STRIPE_WEBHOOK_SECRET` y redeplegar.
+5. **Firebase**: añadir `<app>.vercel.app` a *Authorized domains* y desplegar reglas e índices.
+6. **Agente**: incluir `https://<app>.vercel.app` en `ALLOWED_ORIGINS` del agente.
+7. Activar *Deployment Protection* en previews.
+
+## Tests
+
+```bash
+npm test                 # 97 tests, sin red ni credenciales reales
+npm run test:coverage    # informe en coverage/
+```
+
+firebase-admin, Stripe (excepto la verificación de firma, que usa la librería real con un secreto de prueba),
+Resend y `fetch` están simulados; Firestore se sustituye por un doble en memoria con transacciones
+serializadas (`tests/helpers/fakeFirestore.ts`).
+
+| Grupo | Fichero | Qué cubre |
+|---|---|---|
+| Checkout | `tests/api/checkout.test.ts`, `checkout-unconfigured.test.ts` | 401 sin token o con token inválido; Zod rechaza SKU inexistente, cantidades ≤0, no enteras, enormes o en texto, campos extra (`price`, `uid`), carrito vacío, SKU con inyección, suma >10 de líneas repetidas; 409 agotado; precios SIEMPRE del catálogo (céntimos); `metadata.uid`/`client_reference_id` del token; solo ES; agrupación de SKUs; 502 sin filtrar el error de Stripe; 503 sin credenciales |
+| Webhook | `tests/api/webhook.test.ts` | Firma inválida, ausente o cuerpo alterado → 400 sin escribir; otros eventos y `payment_status ≠ paid` ignorados; pedido completo (ítems, dirección, `statusHistory`); idempotencia con reenvíos y concurrencia (un solo pedido, contador sin saltos, un solo email); `CP-000123` → `CP-000124`; el email falla y el pedido se guarda; fallo de Firestore → 500; sin secreto → 503 |
+| `/api/users/me` | `tests/api/users-me.test.ts` | 401 sin token o inválido; solo escribe `users/{uid del token}` aunque el cuerpo diga otra cosa; `createdAt` no cambia en accesos posteriores |
+| Catálogo y configurador | `tests/unit/catalog.test.ts` | Esquema y SKUs únicos de `data/catalog.json`; resolución de variante por opciones; solo combinaciones existentes (salto a la más parecida, valores inexistentes, agotados); "desde"; subtotal en servidor |
+| Carrito | `tests/unit/cart.test.ts` | Añadir, fusionar misma variante, cambiar cantidad, límites 1–10, eliminar, vaciar, total sin errores de coma flotante, persistencia y rehidratación |
+| Cliente SSE | `tests/unit/chat-client.test.ts` | Los 5 eventos (incluido `replace`); eventos troceados byte a byte; CRLF; JSON roto; `Authorization` solo con sesión; últimos 20 mensajes; 400/401/422/429 (`Retry-After`)/500/503, red y sin configurar |
+| Render del chat | `tests/components/chat-markdown.test.tsx`, `chat-widget.test.tsx` | `<script>` y `<img onerror>` no llegan al DOM; `javascript:` neutralizado; markdown normal; widget: tokens en vivo, `replace` sustituye el texto, 401 ofrece login, 429 y `error` muestran el mensaje, contador de 1000 caracteres, HTML del usuario como texto |
+| Cabeceras y entorno | `tests/security/headers-and-env.test.ts` | `next.config` expone CSP, X-Frame-Options, X-Content-Type-Options y Referrer-Policy; orígenes de Firebase/Google/agente en la CSP; `'unsafe-eval'` solo en dev; `.env.example` sin valores; ninguna `NEXT_PUBLIC_` con nombre de secreto (en `.env.example` y en el código); secretos solo en módulos `server-only`/route handlers; clientes solo leen `NEXT_PUBLIC_`; sin `dangerouslySetInnerHTML` |
+| Varios | `tests/unit/misc.test.ts` | Mensajes de error de Auth en español; `next` seguro (sin redirecciones abiertas); formato de precios/fechas; `verifyBearer` (cabeceras mal formadas, token rechazado); `EmailSender` (log sin clave, Resend con destinatario correcto y propagación de errores) |
+
+Las reglas de Firestore se prueban aparte con el emulador: ver [`firebase/README.md`](../firebase/README.md).
+
+## Solución de problemas
+
+| Síntoma | Causa probable |
+|---|---|
+| "Inicio de sesión no disponible" | Faltan `NEXT_PUBLIC_FIREBASE_*` (hay que reiniciar `npm run dev` o redeplegar) |
+| `auth/unauthorized-domain` al usar Google | El dominio no está en *Authorized domains* de Firebase |
+| `auth/operation-not-allowed` | Proveedor Google o correo no habilitado en Firebase |
+| El popup de Google se abre y se cierra sin iniciar sesión | COOP/CSP modificados; comprobar `Cross-Origin-Opener-Policy: same-origin-allow-popups` y `frame-src` |
+| "El pago no está disponible" (503) | Faltan `STRIPE_SECRET_KEY` o `FIREBASE_ADMIN_CREDENTIALS` |
+| `/checkout/exito` se queda en "Procesando…" | El webhook no llega: `stripe listen` parado, `STRIPE_WEBHOOK_SECRET` distinto o endpoint mal configurado (ver logs `[webhook]`) |
+| Webhook 400 "invalid signature" | Secreto de otro endpoint o de otra sesión de `stripe listen` |
+| "Mis pedidos" da error y la consola menciona un índice | Falta el índice `orders (userId ASC, createdAt DESC)`: `firebase deploy --only firestore:indexes` |
+| El asistente: "No hemos podido conectar" | `NEXT_PUBLIC_AGENT_URL` incorrecta, agente caído o el origen no está en `ALLOWED_ORIGINS` (CORS) |
+| No llega el email | Resend sin dominio verificado solo envía al email del dueño de la cuenta; ver logs `[email]`/`[webhook]` |
+
+## Limitaciones
+
+- **Resend sin dominio verificado** solo entrega al email del dueño de la cuenta de Resend (remitente
+  `onboarding@resend.dev`). Para enviar a cualquier cliente hay que verificar un dominio propio.
+- La tarifa de envío la elige el cliente en Stripe Checkout; no se valida contra el código postal
+  (Baleares/Canarias). Mejora: crear la sesión en dos pasos o validar en el webhook.
+- CSP con `'unsafe-inline'` en scripts (limitación de Next.js sin nonces).
+- Las guardas de ruta son de cliente; la protección de datos está en las reglas de Firestore y en la API.
+- Sin gestión de stock real (`inStock` es un dato del catálogo) ni cálculo de impuestos por región.
+- Las opiniones de la home y las fichas son de ejemplo y están marcadas como tales.
+- Los colchones "A medida" no piden las medidas exactas en la web; se acuerdan después por email.
