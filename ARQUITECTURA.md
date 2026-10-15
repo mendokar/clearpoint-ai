@@ -26,7 +26,7 @@ flowchart LR
 
     W -->|Checkout Session| S[Stripe<br/>modo test]
     S -->|Webhook firmado| W
-    W -->|Email confirmación| R[Resend]
+    W -->|Email confirmación| R[Gmail SMTP]
     W -->|firebase-admin<br/>lectura/escritura| F[(Firestore)]
 
     A -->|firebase-admin<br/>SOLO lectura| F
@@ -43,7 +43,7 @@ flowchart LR
 | **Agente Python (Cloud Run)** | Verificar el token, orquestar el LLM y las tools de consulta | No escribe en la base de datos, no gestiona pagos |
 | **Firebase** | Auth (usuarios) y Firestore (datos) | No se usan Functions ni Hosting |
 | **Stripe** | Página de pago alojada y confirmación vía webhook | Los datos de tarjeta nunca tocan nuestros servidores |
-| **Resend** | Envío del email transaccional | — |
+| **Gmail (SMTP)** | Envío del email transaccional con contraseña de aplicación | — |
 
 ---
 
@@ -59,7 +59,7 @@ flowchart LR
 | Firebase JS SDK | Auth en el cliente y lectura de "Mis pedidos" (protegida por reglas) |
 | firebase-admin | Escritura de pedidos desde el webhook y lectura de catálogo en servidor |
 | stripe (Node) | Checkout Sessions y verificación de webhooks |
-| Resend + React Email | Email de confirmación |
+| Nodemailer (Gmail SMTP) + React Email | Email de confirmación |
 | react-markdown (sin HTML crudo) | Render seguro de las respuestas del asistente |
 
 ### Agente IA — `agent/`
@@ -206,7 +206,7 @@ sequenceDiagram
     participant W as Next.js
     participant S as Stripe
     participant F as Firestore
-    participant R as Resend
+    participant R as Gmail
 
     U->>W: POST /api/checkout (carrito + ID token)
     W->>W: Verifica token y valida con zod
@@ -296,7 +296,7 @@ El asistente puede responder a preguntas generales (productos, envíos) sin sesi
 | Secreto | Ubicación | ¿Llega al navegador? |
 |---|---|---|
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Vercel (sensitive) | No |
-| `RESEND_API_KEY` | Vercel (sensitive) | No |
+| `GMAIL_APP_PASSWORD` | Vercel (sensitive) | No |
 | `FIREBASE_ADMIN_CREDENTIALS` (JSON base64) | Vercel (sensitive) | No |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` | Secret Manager → Cloud Run | No |
 | Acceso del agente a Firestore | Cuenta de servicio de Cloud Run (sin archivo de clave) | No |
@@ -375,7 +375,9 @@ NEXT_PUBLIC_SITE_URL=
 FIREBASE_ADMIN_CREDENTIALS=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
-RESEND_API_KEY=
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
+EMAIL_FROM_NAME=
 EMAIL_FROM=
 ```
 
