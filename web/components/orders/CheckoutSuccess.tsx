@@ -12,29 +12,59 @@ import { useCart } from "@/lib/cart/store";
 import { fetchMyOrder, type OrderWithId } from "@/lib/orders/client";
 import { orderIdSchema } from "@/lib/schemas";
 import { formatPrice } from "@/lib/format";
+import type { CheckoutSessionStatus } from "@/lib/checkout-status";
 
 const POLL_MS = 2000;
 const MAX_ATTEMPTS = 30; // ~1 minuto
 
+type Verify = CheckoutSessionStatus | "checking" | "error";
+
 /**
  * Página de vuelta de Stripe. NO crea el pedido: solo espera a que el webhook
  * lo haya guardado en Firestore y lo muestra.
+ * Antes de confirmar nada pregunta al servidor (que pregunta a Stripe) si la sesión existe, está pagada y
+ * es del usuario. Así una URL con un session_id inventado no muestra "pago completado" ni vacía el carrito.
  */
 export function CheckoutSuccess() {
   const params = useSearchParams();
   const sessionId = params.get("session_id") ?? "";
   const valid = orderIdSchema.safeParse(sessionId).success;
-  const { user, loading } = useAuth();
+  const { user, loading, getToken } = useAuth();
   const clear = useCart((s) => s.clear);
   const [order, setOrder] = useState<OrderWithId | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [verify, setVerify] = useState<Verify>("checking");
 
-  useEffect(() => {
-    if (valid) clear();
-  }, [valid, clear]);
-
+  // 1. Verificación en servidor contra Stripe.
   useEffect(() => {
     if (!valid || !user) return;
+    let active = true;
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`/api/checkout/session?session_id=${encodeURIComponent(sessionId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: "no-store",
+        });
+        const data = res.ok ? ((await res.json()) as { status?: CheckoutSessionStatus }) : null;
+        if (active) setVerify(data?.status ?? "error");
+      } catch {
+        if (active) setVerify("error");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [valid, user, sessionId, getToken]);
+
+  // El carrito solo se vacía cuando el pago está confirmado (o el pedido ya existe).
+  useEffect(() => {
+    if (verify === "paid" || verify === "processing" || order) clear();
+  }, [verify, order, clear]);
+
+  // 2. Espera a que el webhook guarde el pedido. No se consulta si Stripe dice que no existe o no se pagó.
+  useEffect(() => {
+    if (!valid || !user || verify === "checking" || verify === "not_found" || verify === "unpaid") return;
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout>;
     let active = true;
@@ -58,7 +88,7 @@ export function CheckoutSuccess() {
       active = false;
       clearTimeout(timer);
     };
-  }, [valid, user, sessionId]);
+  }, [valid, user, sessionId, verify]);
 
   if (!valid) {
     return (
@@ -71,11 +101,11 @@ export function CheckoutSuccess() {
   if (loading) return <Spinner label="Comprobando tu sesión…" />;
   if (!user) {
     return (
-      <Notice tone="info" title="Pago recibido">
+      <Notice tone="info" title="Comprueba tu pedido">
         <Link href={`/login?next=${encodeURIComponent(`/checkout/exito?session_id=${sessionId}`)}`} className="underline">
           Inicia sesión
         </Link>{" "}
-        para ver tu pedido.
+        para ver el estado de tu pago y de tu pedido.
       </Notice>
     );
   }
@@ -101,6 +131,33 @@ export function CheckoutSuccess() {
           </Link>
         </div>
       </div>
+    );
+  }
+
+  if (verify === "not_found") {
+    return (
+      <Notice tone="warn" title="No encontramos este pago">
+        Este enlace no corresponde a ningún pago de tu cuenta. Revisa tus pedidos en{" "}
+        <Link href="/pedidos" className="underline">Mis pedidos</Link>.
+      </Notice>
+    );
+  }
+
+  if (verify === "unpaid") {
+    return (
+      <Notice tone="warn" title="El pago no se completó">
+        No se ha cobrado nada. Tu carrito sigue guardado: puedes{" "}
+        <Link href="/carrito" className="underline">volver al carrito</Link> e intentarlo de nuevo.
+      </Notice>
+    );
+  }
+
+  if (timedOut && verify !== "paid") {
+    return (
+      <Notice tone="warn" title="Aún no podemos confirmar tu pago">
+        Si has pagado, el pedido aparecerá en <Link href="/pedidos" className="underline">Mis pedidos</Link> en unos
+        minutos. Si no aparece, escríbenos a hola@contoso.example.
+      </Notice>
     );
   }
 

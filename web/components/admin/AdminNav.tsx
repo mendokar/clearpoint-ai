@@ -13,7 +13,7 @@ const LINKS = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Secciones del panel" className="mb-8 overflow-x-auto border-b border-line">
+    <nav aria-label="Secciones del panel" className="mb-8 overflow-x-auto overflow-y-hidden border-b border-line">
       <ul className="m-0 flex min-w-max list-none gap-1 p-0">
         {LINKS.map((l) => {
           const active = l.exact ? pathname === l.href : pathname.startsWith(l.href);
