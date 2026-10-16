@@ -168,3 +168,13 @@ npm test         # node:test con tsx: set-admin con un doble de firebase-admin/a
 ```bash
 npm run typecheck
 ```
+
+## Restaurar solo los pedidos de demo
+
+Después de probar cambios de estado en el panel:
+
+```bash
+npm run seed:pedidos
+```
+
+Devuelve CP-000101, CP-000118, CP-000120 y CP-000123 a su estado de `data/demo_orders.json`. No modifica colchones, política, contraseñas ni otros pedidos. El contador de pedidos nunca retrocede.

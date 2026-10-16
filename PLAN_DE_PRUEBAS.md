@@ -86,6 +86,16 @@ Desarrollo también puede hacerlo por script, pasando por cada estado intermedio
 cd scripts && npx tsx --env-file=.env update-order-status.ts CP-000123 preparing
 ```
 
+### Restaurar los pedidos de demo
+
+Después de probar el panel, los pedidos CP-000101, 118, 120 y 123 se devuelven a su estado documentado con este comando. No toca colchones, política, contraseñas ni pedidos reales como los de QA:
+
+```bash
+cd scripts && npm run seed:pedidos
+```
+
+Prueba los cambios de estado preferiblemente con un pedido propio, no con los de demo.
+
 ---
 
 ## 4. Pruebas automáticas
@@ -94,11 +104,11 @@ Todas se ejecutan sin red ni credenciales reales: los servicios externos están 
 
 | Suite | Comando | Pruebas | Estado a 16/10/2026 |
 |---|---|---|---|
-| Web (Vitest) | `cd web && npm test` | 315 | ✅ Todas pasan |
+| Web (Vitest) | `cd web && npm test` | 320 | ✅ Todas pasan |
 | Asistente (pytest) | `cd agent && .venv/bin/python -m pytest --cov=app` | 138 | ✅ Todas pasan |
 | Reglas de Firestore y Storage (emulador) | `cd firebase && npm run test:rules` | 32 | ✅ Todas pasan. Requiere Java 21 en `JAVA_HOME` |
 | Scripts (node:test) | `cd scripts && npm test` | 10 | ✅ Todas pasan |
-| **Total** | | **495** | |
+| **Total** | | **500** | |
 
 ### Web
 
@@ -116,6 +126,7 @@ Todas se ejecutan sin red ni credenciales reales: los servicios externos están 
 | `tests/unit/product-badge.test.ts` | 3 | La etiqueta de la tarjeta es un dato editable y se valida en el servidor |
 | `tests/unit/format-options.test.ts` | 2 | Opciones siempre como medida, núcleo y funda |
 | `tests/unit/cart.test.ts` | 4 | Añadir, fusionar, cambiar cantidad, eliminar y persistir |
+| `tests/api/cart-quote.test.ts`, `tests/components/cart-quote.test.tsx` | 5 | El carrito consulta precio y disponibilidad actuales, avisa de cambios, excluye lo retirado y bloquea el pago |
 | `tests/unit/chat-client.test.ts` | 16 | Lectura del streaming del asistente, eventos de error, 401 y 429 |
 | `tests/unit/misc.test.ts` | 12 | Mensajes de error de login, redirecciones seguras, formatos, envío de email por Gmail |
 
@@ -217,6 +228,8 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 | CP-CAR-04 | Eliminar una línea y pulsar "Deshacer" | La línea desaparece y vuelve al deshacer | M |
 | CP-CAR-05 | Recargar la página | El carrito se conserva | M |
 | CP-CAR-06 | Pulsar Pagar sin sesión iniciada | Muestra "Inicia sesión para pagar" y, tras iniciar sesión, vuelve al carrito | A |
+| CP-CAR-07 | Con un colchón en el carrito, cambiar su precio en el panel y volver a abrir el carrito | El carrito muestra el precio nuevo, avisa con "Precios actualizados" y el total coincide con lo que cobra Stripe | A |
+| CP-CAR-08 | Con un colchón en el carrito, desactivarlo o marcar su variante sin stock en el panel y abrir el carrito | La línea dice "Ya no está a la venta" o "Agotado", no suma al total, el aviso nombra el producto y no deja pagar hasta quitarlo | A |
 
 ### 5.3 Autenticación (R2)
 
@@ -243,7 +256,7 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 | CP-PAG-05 | Comprar con una cuenta cuyo buzón puedas revisar. Con un correo ajeno, como demo1@gmail.com, no se puede comprobar | Llega el email "Pedido CP-000xxx confirmado" desde Colchones Contoso. Revisar también spam | A |
 | CP-PAG-06 | Pagar con la tarjeta 3155 | Stripe pide 3D Secure. Al aprobarlo se crea el pedido | B |
 | CP-PAG-07 | Recargar varias veces la página de éxito | No se duplica el pedido | M |
-| CP-PAG-08 | Con sesión, abrir `/checkout/exito?session_id=cs_test_inventado789` | "No encontramos este pago". No dice que el pago se completó y el carrito no se vacía. Sin sesión pide iniciar sesión sin afirmar que hubo pago | A |
+| CP-PAG-08 | Con sesión, abrir `/checkout/exito?session_id=cs_test_inventado789` | El título es "Estado de tu pago" y el aviso "No encontramos este pago". No dice que el pago se completó y el carrito no se vacía. Sin sesión pide iniciar sesión sin afirmar que hubo pago | A |
 
 ### 5.5 Mis pedidos y aislamiento (R2)
 
@@ -253,6 +266,7 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 | CP-PED-02 | Abrir el detalle de CP-000118 | Línea de tiempo de estados, SEUR, número de seguimiento y fecha estimada | A |
 | CP-PED-03 | Con demo1, abrir `/pedidos/cs_test_demo_000120`, que es el pedido CP-000120 de demo2. La URL del detalle usa el identificador de Stripe, no el número de pedido | Muestra "Pedido no encontrado" y no revela ningún dato. Con demo2, la misma URL sí muestra el pedido | A |
 | CP-PED-04 | Hacer una compra nueva y abrir Mis pedidos | El pedido nuevo aparece el primero | A |
+| CP-PED-05 | Abrir el detalle de un pedido con varios productos | Las opciones de todas las líneas salen en el mismo orden: medida, núcleo y funda. Igual en el carrito y en el email | B |
 
 ### 5.6 Asistente IA (R5)
 
@@ -270,9 +284,8 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 | CP-ASI-10 | Escribir un mensaje de más de 1000 caracteres | El campo no admite más de 1000 caracteres y el contador lo indica | M |
 | CP-ASI-11 | Enviar más de 20 mensajes en 10 minutos | Aviso de demasiadas peticiones | B |
 | CP-ASI-12 | Mientras consulta datos, observar el chat | Aparece el indicador de "escribiendo" y el aviso de consulta | B |
-| CP-ASI-14 | Con un pedido hecho de madrugada en España, preguntar al asistente cuándo se hizo y en qué estado está | Fecha y hora iguales a las de la web, en hora peninsular. El estado se nombra igual que en la web: Pagado, En preparación, Enviado, Entregado o Cancelado | M |
-| CP-PED-05 | Abrir el detalle de un pedido con varios productos | Las opciones de todas las líneas salen en el mismo orden: medida, núcleo y funda. Igual en el carrito y en el email | B |
 | CP-ASI-13 | Preguntar por el envío a Baleares y, en el mensaje siguiente, por la devolución desde allí | La segunda respuesta no corrige la primera ni dice que no estaba verificada. No hay palabras pegadas | M |
+| CP-ASI-14 | Con un pedido hecho de madrugada en España, preguntar al asistente cuándo se hizo y en qué estado está | Fecha y hora iguales a las de la web, en hora peninsular. El estado se nombra igual que en la web: Pagado, En preparación, Enviado, Entregado o Cancelado | M |
 
 ### 5.7 Responsive, accesibilidad y experiencia (R6)
 
@@ -281,13 +294,14 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 | CP-RES-01 | Recorrer home, ficha, carrito, login y pedidos a 390 px | Sin scroll horizontal ni textos cortados | A |
 | CP-RES-02 | Lo mismo a 1280 px | Diseño completo sin solapes | A |
 | CP-RES-03 | En móvil, bajar en la ficha hasta que salga de pantalla el botón de añadir | Aparece la barra fija de compra | M |
-| CP-RES-08 | En móvil, bajar hasta el final del carrito, del registro y de la home | El total del carrito, el botón "Crear cuenta" y el pie quedan por encima del botón "¿Te ayudo?" | M |
-| CP-RES-09 | En móvil, ver la tabla de núcleos | Las tres columnas, incluida Ceiba+, caben sin deslizar | B |
-| CP-RES-10 | Eliminar un producto del carrito y esperar | El aviso con "Deshacer" se mantiene unos 8 segundos. Los avisos sin acción, unos 4,5 | B |
 | CP-RES-04 | Activar el modo oscuro del sistema | Colores legibles en todas las pantallas | M |
 | CP-RES-05 | Activar "reducir movimiento" en el sistema | Las animaciones se desactivan y todo el contenido sigue visible | M |
 | CP-RES-06 | Navegar con el teclado por cabecera, ficha, mini carrito y chat | Foco visible. Escape cierra el mini carrito y el chat | M |
 | CP-RES-07 | Abrir la web desde España o con una VPN española | Carga sin bloqueos | A |
+| CP-RES-08 | En móvil, bajar hasta el final del carrito, del registro y de la home | El total del carrito, el botón "Crear cuenta" y el pie quedan por encima del botón "¿Te ayudo?" | M |
+| CP-RES-09 | En móvil, ver la tabla de núcleos | Las tres columnas, incluida Ceiba+, caben sin deslizar | B |
+| CP-RES-10 | Eliminar un producto del carrito y esperar | El aviso con "Deshacer" se mantiene unos 8 segundos. Los avisos sin acción, unos 4,5 | B |
+| CP-RES-11 | En móvil, con admin, abrir el formulario de un colchón | No aparece el botón "¿Te ayudo?", la barra de Guardar y Cancelar se ve entera, "Principal" no se parte y cada variante se ve como tarjeta con SKU, opciones, precio y stock sin deslizar | M |
 
 ### 5.8 Panel de administración
 
@@ -302,14 +316,14 @@ Requiere la cuenta admin@contoso.example. Ninguna otra cuenta puede entrar, aunq
 | CP-ADM-05 | Marcar una variante sin stock | En la ficha sale "(agotado)" y no se puede comprar | M |
 | CP-ADM-06 | Desactivar un colchón y luego borrarlo | Desaparece de la home, su ficha da 404 y no vuelve a aparecer | A |
 | CP-ADM-07 | Cambiar la etiqueta de la tarjeta de un colchón | La home muestra la etiqueta nueva o ninguna si se deja vacía | B |
-| CP-ADM-08 | Hacer una compra y mirar el buzón de la tienda | Llega el aviso de pedido nuevo con enlace al panel. En la lista sale como "Nuevo" | A |
+| CP-ADM-08 | Hacer una compra y mirar el buzón de la tienda, que es `ADMIN_NOTIFICATION_EMAIL` o, si no está, la cuenta de Gmail remitente (mendokardesigner@gmail.com) | Llega el aviso de pedido nuevo con enlace al panel. En la lista sale como "Nuevo" | A |
 | CP-ADM-09 | Pasar un pedido de Pagado a Enviado directamente | El panel lo impide | M |
 | CP-ADM-10 | Pasar un pedido a En preparación y después a Enviado sin seguimiento | Pide transportista, seguimiento y fecha estimada | M |
 | CP-ADM-11 | Completar el paso a Enviado y preguntar al asistente por el pedido | El cliente recibe el email de envío y el asistente da el estado nuevo con el seguimiento | A |
 | CP-ADM-12 | Cambiar un estado con la casilla de notificar desmarcada | El estado cambia y no se envía email | B |
 | CP-ADM-13 | Revisar el resumen de `/admin` tras una compra | Suben los pedidos y la facturación de hoy | B |
 | CP-ADM-14 | Con admin, subir dos fotos arrastrándolas al formulario de un colchón y guardar | Se ve el progreso, se comprimen y aparecen en la ficha de la tienda | A |
-| CP-ADM-15 | Intentar subir un PDF o una imagen de más de 20 MB | El panel lo rechaza con un mensaje claro | M |
+| CP-ADM-15 | Intentar subir un PDF, una imagen de más de 20 MB y una imagen que tras comprimirse siga pesando 5 MB o más | Las tres se rechazan antes de subir, con un mensaje en español que dice el motivo: tipo no permitido o tamaño. Si alguien se salta el panel, Storage rechaza cualquier fichero de 5 MB o más | M |
 | CP-ADM-16 | Iniciar sesión con demo1 y abrir `/admin` o llamar a `/api/admin/summary` | Vuelve a la home y la API responde 403 | A |
 | CP-ADM-17 | Registrar una cuenta nueva con una contraseña de 5 caracteres | Se rechaza con el mensaje de 8 caracteres mínimo | M |
 | CP-ADM-18 | Crear un colchón nuevo: escribir el slug, subir fotos, completar datos y guardar | Antes de escribir un slug válido no deja subir. Tras subir la primera foto el slug queda bloqueado | M |
@@ -334,7 +348,9 @@ Requiere la cuenta admin@contoso.example. Ninguna otra cuenta puede entrar, aunq
 ## 6. Criterios de entrada y salida
 
 **Entrada**
-- Las tres suites automáticas pasan.
+- Las cuatro suites automáticas pasan.
+- El panel muestra la zona de subida de fotos, señal de que `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` está configurada en Vercel.
+- Los pedidos de demo están en su estado documentado (`npm run seed:pedidos`).
 - La web y el asistente responden en sus URLs.
 - Los datos de demo están cargados.
 

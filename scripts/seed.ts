@@ -51,9 +51,27 @@ async function upsertUser(email: string, password: string, displayName: string):
 
 const ts = (iso: string) => Timestamp.fromDate(new Date(iso));
 
+/**
+ * `--solo-pedidos`: restaura únicamente los pedidos de demo (CP-000101, 118, 120 y 123) a su estado
+ * documentado, sin tocar colchones, política ni contraseñas. Útil después de probar el panel (QA).
+ */
+const ORDERS_ONLY = process.argv.includes("--solo-pedidos");
+
 async function main() {
   initAdmin();
   const now = Timestamp.now();
+  const demo1Email = process.env.DEMO1_EMAIL ?? "demo1@contoso.example";
+  const demo2Email = process.env.DEMO2_EMAIL ?? "demo2@contoso.example";
+
+  if (ORDERS_ONLY) {
+    const uid1 = (await auth().getUserByEmail(demo1Email)).uid;
+    const uid2 = (await auth().getUserByEmail(demo2Email)).uid;
+    await seedOrders(
+      { DEMO_UID_1: { uid: uid1, email: demo1Email }, DEMO_UID_2: { uid: uid2, email: demo2Email } },
+      now,
+    );
+    return;
+  }
 
   // 1. Productos
   const catalog = catalogSchema.parse(readJson(new URL("catalog.json", DATA)));
@@ -73,8 +91,6 @@ async function main() {
   console.log(`✓ ${catalog.products.length} productos y la política de envíos`);
 
   // 3. Usuarios demo (contraseñas SOLO desde variables de entorno)
-  const demo1Email = process.env.DEMO1_EMAIL ?? "demo1@contoso.example";
-  const demo2Email = process.env.DEMO2_EMAIL ?? "demo2@contoso.example";
   const uid1 = await upsertUser(demo1Email, env("DEMO1_PASSWORD"), "Demo Uno");
   const uid2 = await upsertUser(demo2Email, env("DEMO2_PASSWORD"), "Demo Dos");
   const uidMap: Record<string, { uid: string; email: string }> = {
@@ -94,7 +110,11 @@ async function main() {
   }
   console.log(`✓ usuarios demo: ${demo1Email} (${uid1}), ${demo2Email} (${uid2})`);
 
-  // 4. Pedidos demo
+  await seedOrders(uidMap, now);
+}
+
+/** 4 y 5. Pedidos demo (sobrescribe su estado) y contador, que nunca retrocede. */
+async function seedOrders(uidMap: Record<string, { uid: string; email: string }>, now: Timestamp) {
   const { orders } = ordersSchema.parse(readJson(new URL("demo_orders.json", DATA)));
   let maxNumber = 0;
   const ordersBatch = db().batch();
