@@ -18,8 +18,9 @@ Comprobar que la tienda cumple los requisitos de la prueba técnica de Clearpoin
 | R4 | Email real de confirmación tras el pago | CP-PAG-05 |
 | R5 | Asistente de consulta sobre productos, envíos y devoluciones, y pedidos actualizados del usuario autenticado | CP-ASI |
 | R6 | Funciona en móvil y escritorio, desplegado y accesible desde España | CP-RES |
+| Extra | Panel de administración: colchones, fotos, pedidos y avisos por email, solo para admin@contoso.example | CP-ADM |
 
-**Fuera de alcance:** pruebas de carga, pagos reales, panel de administración (no existe) y gestión de stock.
+**Fuera de alcance:** pruebas de carga, pagos reales, reembolsos y gestión de stock real.
 
 ---
 
@@ -31,7 +32,9 @@ Hay un único ambiente.
 |---|---|
 | Tienda web | https://clearpoint-ai.vercel.app |
 | Asistente IA | https://agent-305860844301.europe-southwest1.run.app |
+| Panel de administración | https://clearpoint-ai.vercel.app/admin |
 | Base de datos y usuarios | Firebase, proyecto `clearpoint-colchones` |
+| Fotos de productos | Firebase Storage, bucket `clearpoint-colchones.firebasestorage.app` (Madrid) |
 | Pagos | Stripe en modo test |
 
 Navegadores mínimos: Chrome y Safari actuales, en escritorio a 1280 px y en móvil a 390 px.
@@ -48,6 +51,7 @@ Las contraseñas están en la sección "Datos y accesos de demostración" del [`
 |---|---|
 | `demo1@contoso.example` | CP-000101 entregado, CP-000118 enviado con SEUR y seguimiento, CP-000123 pagado |
 | `demo2@contoso.example` | CP-000120 en preparación, a medida y con envío a Baleares |
+| `admin@contoso.example` | Ninguno. Es la única cuenta que entra al panel. Su contraseña se entrega por un canal privado, no está en el repositorio |
 
 Los correos de demo son ficticios y no reciben emails. **Para probar el email de confirmación hay que usar una cuenta con correo real**, registrándose o entrando con Google.
 
@@ -72,10 +76,14 @@ Hay dos combinaciones sin stock en el catálogo, útiles para probar ese estado.
 
 ### Cambiar el estado de un pedido
 
-Requiere acceso al repositorio y a las credenciales. Si QA no lo tiene, lo ejecuta desarrollo bajo petición.
+Desde el panel, con la cuenta de administrador: **Pedidos**, abrir el pedido y elegir el estado siguiente. Al pasar a Enviado se piden transportista, seguimiento y fecha estimada.
+
+Son cambios reales en los datos. Antes de cambiar un pedido de otra persona, pide permiso a quien lo hizo.
+
+Desarrollo también puede hacerlo por script, pasando por cada estado intermedio:
 
 ```bash
-cd scripts && npx tsx --env-file=.env update-order-status.ts CP-000123 shipped
+cd scripts && npx tsx --env-file=.env update-order-status.ts CP-000123 preparing
 ```
 
 ---
@@ -84,7 +92,7 @@ cd scripts && npx tsx --env-file=.env update-order-status.ts CP-000123 shipped
 
 Todas se ejecutan sin red ni credenciales reales: los servicios externos están simulados.
 
-| Suite | Comando | Pruebas | Estado a 15/10/2026 |
+| Suite | Comando | Pruebas | Estado a 16/10/2026 |
 |---|---|---|---|
 | Web (Vitest) | `cd web && npm test` | 315 | ✅ Todas pasan |
 | Asistente (pytest) | `cd agent && .venv/bin/python -m pytest --cov=app` | 138 | ✅ Todas pasan |
@@ -94,19 +102,46 @@ Todas se ejecutan sin red ni credenciales reales: los servicios externos están 
 
 ### Web
 
+**Tienda y pago**
+
 | Fichero | Pruebas | Qué cubre |
 |---|---|---|
-| `tests/api/checkout.test.ts` | 19 | Token obligatorio, validación de SKU y cantidades, precios siempre del catálogo, uid tomado del token |
+| `tests/api/checkout.test.ts` | 19 | Token obligatorio, validación de SKU y cantidades, precios siempre del catálogo, uid tomado del token, productos inactivos y variantes agotadas |
+| `tests/api/checkout-session.test.ts` | 7 | La página de éxito pregunta a Stripe: sesiones inventadas o de otro usuario dan "no encontrado" |
 | `tests/api/checkout-unconfigured.test.ts` | 1 | Respuesta controlada si faltan credenciales |
-| `tests/api/webhook.test.ts` | 11 | Firma de Stripe, solo pagos completados, sin pedidos duplicados, número correlativo, pedido guardado aunque falle el email |
+| `tests/api/webhook.test.ts` | 14 | Firma de Stripe, solo pagos completados, sin pedidos duplicados, número correlativo, email al cliente y aviso a la tienda sin bloquear el pedido |
 | `tests/api/users-me.test.ts` | 4 | El perfil solo se escribe para el usuario del token |
 | `tests/unit/catalog.test.ts` | 10 | Esquema del catálogo, SKU únicos, combinaciones válidas, totales |
-| `tests/unit/catalog-firestore.test.ts` | 2 | Las fechas de Firestore se convierten a texto antes de llegar a la página |
+| `tests/unit/catalog-firestore.test.ts` | 7 | Catálogo solo desde Firestore, sin volver al fichero de semilla, y fechas convertidas a texto |
+| `tests/unit/product-badge.test.ts` | 3 | La etiqueta de la tarjeta es un dato editable y se valida en el servidor |
+| `tests/unit/format-options.test.ts` | 2 | Opciones siempre como medida, núcleo y funda |
 | `tests/unit/cart.test.ts` | 4 | Añadir, fusionar, cambiar cantidad, eliminar y persistir |
 | `tests/unit/chat-client.test.ts` | 16 | Lectura del streaming del asistente, eventos de error, 401 y 429 |
 | `tests/unit/misc.test.ts` | 12 | Mensajes de error de login, redirecciones seguras, formatos, envío de email por Gmail |
-| `tests/components/*.tsx` | 25 | Mini carrito, carrito, avisos y su duración, ventana del chat, que el chat no ejecute HTML y el ojo de las contraseñas |
-| `tests/security/headers-and-env.test.ts` | 9 | Cabeceras de seguridad y que ninguna variable pública contenga secretos |
+
+**Panel de administración y fotos**
+
+| Fichero | Pruebas | Qué cubre |
+|---|---|---|
+| `tests/api/admin-products.test.ts` | 44 | Sin token 401, cliente o claim falso 403, otra cuenta con claim o sin correo verificado 403, crear, editar, activar, borrar con sus fotos, slug y SKU duplicados |
+| `tests/api/admin-orders.test.ts` | 37 | Lista, filtros y paginación, transiciones válidas e inválidas, Enviado exige seguimiento, emails al cliente sin repetir, distintivo de pedido nuevo |
+| `tests/unit/admin-logic.test.ts` | 29 | Generador de variantes, validación de productos e imágenes permitidas, reglas de estado |
+| `tests/unit/admin-emails.test.ts` | 8 | Plantillas del aviso a la tienda y de los cambios de estado |
+| `tests/unit/admin-allowlist.test.ts` | 2 | Solo admin@contoso.example con claim y correo verificado |
+| `tests/unit/image-upload.test.ts` | 43 | Tipos y tamaños de foto, compresión, nombres de fichero y URLs solo de nuestro bucket |
+| `tests/components/image-uploader.test.tsx` | 9 | Subida con progreso, error, cancelación y añadir la URL al producto |
+| `tests/components/require-admin.test.tsx` | 6 | El panel no se muestra a clientes ni a otra cuenta con claim |
+
+**Interfaz y seguridad**
+
+| Fichero | Pruebas | Qué cubre |
+|---|---|---|
+| `tests/components/checkout-success.test.tsx` | 3 | Con un pago inventado no confirma ni vacía el carrito |
+| `tests/components/cart-drawer.test.tsx`, `cart-view.test.tsx` | 6 | Mini carrito, foco, Escape, barra fija, selector de cantidad y deshacer |
+| `tests/components/chat-widget.test.tsx`, `chat-markdown.test.tsx` | 14 | Ventana del chat y que no ejecute HTML |
+| `tests/components/toaster.test.tsx` | 4 | Avisos y su duración |
+| `tests/components/password-input.test.tsx` | 1 | Ojo para mostrar u ocultar la contraseña |
+| `tests/security/headers-and-env.test.ts` | 10 | Cabeceras de seguridad, CSP con Storage y que ninguna variable pública contenga secretos |
 
 ### Asistente
 
@@ -130,7 +165,31 @@ Todas se ejecutan sin red ni credenciales reales: los servicios externos están 
 8. Productos y política no se pueden escribir, ni con sesión.
 9. Cada usuario lee solo su perfil.
 10. El cliente no puede escribir perfiles.
-11. Cualquier otra colección está denegada.
+11. Un administrador tampoco puede escribir productos ni pedidos desde el navegador.
+12. Un administrador tampoco puede leer ni listar pedidos ajenos desde el navegador.
+13. Cualquier otra colección está denegada.
+
+### Reglas de Storage
+
+1. admin@contoso.example sube fotos válidas en WebP, JPEG, PNG y AVIF.
+2. Un cliente, un anónimo o un claim falso no pueden subir.
+3. Otra cuenta con claim de administrador no puede subir.
+4. admin@contoso.example sin correo verificado, o sin claim, no puede subir.
+5. Un correo parecido, con otras mayúsculas o espacios, no cuenta.
+6. Se rechazan ficheros de 5 MB o más y tipos que no son imágenes.
+7. Se rechazan slugs no válidos y rutas fuera de `products/`.
+8. Las fotos de producto se pueden ver sin sesión.
+9. Fuera de `products/` no se puede leer, ni siendo administrador.
+10. Solo el administrador puede listar la carpeta de un producto.
+11. Solo el administrador puede borrar fotos, y nunca fuera de `products/`.
+
+### Scripts
+
+El script que concede el rol de administrador:
+- valida sus argumentos y es idempotente;
+- conserva los demás claims;
+- al quitar el rol, cierra las sesiones abiertas;
+- se niega a conceder el rol a correos fuera de la lista permitida.
 
 ---
 
@@ -232,7 +291,7 @@ Prioridad: **A** bloquea la entrega, **M** es importante, **B** es deseable.
 
 ### 5.8 Panel de administración
 
-Requiere una cuenta con el rol de administrador.
+Requiere la cuenta admin@contoso.example. Ninguna otra cuenta puede entrar, aunque tenga el rol.
 
 | Id | Pasos | Resultado esperado | Prioridad |
 |---|---|---|---|
@@ -253,6 +312,11 @@ Requiere una cuenta con el rol de administrador.
 | CP-ADM-15 | Intentar subir un PDF o una imagen de más de 20 MB | El panel lo rechaza con un mensaje claro | M |
 | CP-ADM-16 | Iniciar sesión con demo1 y abrir `/admin` o llamar a `/api/admin/summary` | Vuelve a la home y la API responde 403 | A |
 | CP-ADM-17 | Registrar una cuenta nueva con una contraseña de 5 caracteres | Se rechaza con el mensaje de 8 caracteres mínimo | M |
+| CP-ADM-18 | Crear un colchón nuevo: escribir el slug, subir fotos, completar datos y guardar | Antes de escribir un slug válido no deja subir. Tras subir la primera foto el slug queda bloqueado | M |
+| CP-ADM-19 | Reordenar las fotos de un colchón con las flechas y guardar | La primera foto pasa a ser la principal en la home y en la ficha | B |
+| CP-ADM-20 | Borrar un colchón que tenga fotos subidas | Desaparece de la tienda y el panel confirma que sus fotos se borraron | M |
+| CP-ADM-21 | Cancelar un pedido Pagado o En preparación | El cliente recibe el email de cancelación. El panel avisa de que no se reembolsa en Stripe | M |
+| CP-ADM-22 | Intentar cambiar un pedido Entregado o Cancelado | El panel no ofrece más estados | B |
 
 ### 5.9 Seguridad
 
@@ -310,5 +374,11 @@ No se reportan como defecto:
 - La opción "A medida" se puede comprar, pero las medidas se acuerdan después por email.
 - La tarifa de envío la elige el comprador en Stripe y no se valida contra el código postal.
 - El límite de mensajes del asistente es por instancia y no se comparte entre instancias.
-- El panel no sube imágenes y cancelar no reembolsa en Stripe.
+- Cancelar un pedido desde el panel no lo reembolsa en Stripe.
+- Quitar una foto del formulario no borra el fichero de Storage. Tampoco se borran las fotos subidas a un colchón nuevo que no se llega a guardar.
+- Si el navegador no puede comprimir a WebP, se sube la foto original, siempre que pese menos de 5 MB.
+- Las fotos se añaden en el orden en que terminan de subirse. Se pueden reordenar después.
+- Volver a ejecutar el script de seed sobrescribe los dos colchones iniciales con los datos del fichero de semilla.
+- Si se cambia el correo de administrador, hay que editar también las reglas de Storage y volver a desplegarlas.
+- El asistente no repite identificadores internos como los de Stripe: su filtro de salida los bloquea.
 - Si el filtro de salida del asistente bloquea una respuesta, el texto ya mostrado se sustituye por un mensaje genérico.
