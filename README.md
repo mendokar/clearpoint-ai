@@ -278,6 +278,17 @@ Resumen. El detalle está en la sección 7 de [`ARQUITECTURA.md`](ARQUITECTURA.m
 - Firebase exige contraseñas de al menos 8 caracteres también en el servidor y tiene activada la protección contra la enumeración de correos.
 - Las fotos se suben directamente a Firebase Storage. Solo el administrador puede subir o borrar, con un máximo de 5 MB y solo imágenes JPG, PNG, WebP o AVIF dentro de `products/`.
 
+**Auditoría del 16/10/2026**
+
+| Revisión | Resultado |
+|---|---|
+| Secretos en ficheros actuales (gitleaks) | Ninguno |
+| Secretos en todo el historial de Git | Solo la configuración web de Firebase en el primer commit, que es pública por diseño |
+| Ficheros `.env` con valores reales | Todos ignorados por Git |
+| Dependencias Python del asistente (pip-audit, 88 paquetes) | Sin vulnerabilidades |
+| Dependencias npm que llegan a producción | Sin críticas ni altas. Quedan avisos moderados de `uuid` dentro de las librerías de Google, no explotables en nuestro uso |
+| Dependencias npm solo de desarrollo | Quedan avisos de vitest, eslint y firebase-tools. No se despliegan |
+
 ---
 
 ## Decisiones y cambios respecto al plan inicial
