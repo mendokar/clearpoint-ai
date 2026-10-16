@@ -38,7 +38,9 @@ export async function priceCart(body: unknown, catalog: Pick<CatalogRepository, 
   for (const [sku, quantity] of qtyBySku) {
     if (quantity > 10) throw new CheckoutError(400, "Máximo 10 unidades por producto.");
     const found = await catalog.findBySku(sku);
-    if (!found) throw new CheckoutError(400, "Alguno de los productos ya no está disponible.");
+    if (!found) {
+      throw new CheckoutError(400, `Un producto del carrito ya no está a la venta (SKU ${sku}). Quítalo del carrito para continuar.`);
+    }
     if (!found.variant.inStock) {
       throw new CheckoutError(409, `${found.product.name} (${formatOptions(found.variant.options, ", ")}) está agotado.`);
     }

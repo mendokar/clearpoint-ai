@@ -26,12 +26,15 @@ const line = {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // La consulta de precios del carrito responde sin cambios en estas pruebas.
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ lines: [] }), { status: 200 })));
   useCart.setState({ lines: [line] });
   useToasts.setState({ toasts: [] });
 });
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("CartView", () => {
