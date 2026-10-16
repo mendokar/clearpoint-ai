@@ -61,7 +61,7 @@ Contoso es una tienda online de colchones de adulto con identidad colombiana: ta
 
 ## Arquitectura
 
-El documento completo está en [`ARQUITECTURA.md`](ARQUITECTURA.md). Este es el resumen:
+El documento completo está en [`ARQUITECTURA.md`](ARQUITECTURA.md), versión 2. El plan inicial se conserva como versión 1 en [`ARQUITECTURA_v1.md`](ARQUITECTURA_v1.md) y los diagramas para la presentación están en [`PRESENTACION.md`](PRESENTACION.md). Este es el resumen:
 
 ```mermaid
 flowchart LR
@@ -94,7 +94,9 @@ clearpoint-ai/
 ├── scripts/        Seed de datos y avance de estados de pedido                  → scripts/README.md
 ├── webbase/        Páginas de referencia de Clearpoint (solo consulta local, excluida de Git)
 ├── docs/           Memoria técnica
-├── ARQUITECTURA.md Documento de arquitectura
+├── ARQUITECTURA.md Documento de arquitectura vigente (versión 2)
+├── ARQUITECTURA_v1.md Plan inicial (versión 1, histórico)
+├── PRESENTACION.md Resumen con diagramas Mermaid para la presentación
 ├── PLAN_DE_PRUEBAS.md Plan de pruebas para QA: pruebas automáticas y casos manuales
 └── README.md       Este documento
 ```
@@ -263,7 +265,7 @@ URL pública: https://clearpoint-ai.vercel.app (pendiente de primer despliegue c
 
 ## Seguridad
 
-Resumen. El detalle está en la sección 8 de [`ARQUITECTURA.md`](ARQUITECTURA.md).
+Resumen. El detalle está en la sección 7 de [`ARQUITECTURA.md`](ARQUITECTURA.md).
 
 - Los precios se recalculan en el servidor. El cliente solo envía SKU y cantidad.
 - Los pedidos solo se crean desde el webhook firmado de Stripe y de forma idempotente.
