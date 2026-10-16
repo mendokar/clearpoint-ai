@@ -180,12 +180,22 @@ export function ProductForm({ mode, initial }: Props) {
           maxLength={5000}
           multiline
         />
-        <label className="flex items-center gap-3">
-          <input type="checkbox" className="h-5 w-5 accent-[var(--aji)]" checked={f.active} onChange={(e) => set("active", e.target.checked)} />
-          <span>
-            <b>Activo</b> <span className="text-sm text-muted">— visible en la tienda y disponible para comprar</span>
+        <div className="flex items-center gap-3">
+          <input
+            id="product-active"
+            type="checkbox"
+            className="h-5 w-5 accent-[var(--aji)]"
+            checked={f.active}
+            aria-describedby="product-active-hint"
+            onChange={(e) => set("active", e.target.checked)}
+          />
+          <label htmlFor="product-active" className="font-bold">
+            Activo
+          </label>
+          <span id="product-active-hint" className="text-sm text-muted">
+            Visible en la tienda y disponible para comprar
           </span>
-        </label>
+        </div>
       </Section>
 
       <ImagesSection
@@ -414,8 +424,8 @@ function ImagesSection({
                 <span className="h-14 w-14 flex-none rounded-lg bg-tint" aria-hidden="true" />
               )}
               <span className="mono min-w-0 flex-1 text-xs break-all">
-                {i === 0 && <span className="pill !ml-0 mr-2">Principal</span>}
-                {isUploadedImage(src) && <span className="pill !ml-0 mr-2">Subida</span>}
+                {i === 0 && <span className="pill !ml-0 mr-2 whitespace-nowrap">Principal</span>}
+                {isUploadedImage(src) && <span className="pill !ml-0 mr-2 whitespace-nowrap">Subida</span>}
                 {src}
               </span>
               <span className="flex gap-1">
@@ -746,7 +756,7 @@ function VariantsSection({
         <p className="text-sm text-muted">Sin variantes. Define las opciones y pulsa «Generar combinaciones».</p>
       ) : (
         <div className="cores-wrap">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
+          <table className="variants-table w-full min-w-[640px] border-collapse text-sm">
             <caption className="sr-only">Variantes del producto</caption>
             <thead>
               <tr className="border-b border-line text-left">
@@ -769,7 +779,7 @@ function VariantsSection({
                 const rowError = errors[`variants.${i}.sku`] ?? errors[`variants.${i}.price`] ?? errors[`variants.${i}.options`];
                 return (
                   <tr key={i} className={`border-b border-line last:border-0 ${rowError ? "bg-[color-mix(in_srgb,var(--danger)_8%,transparent)]" : ""}`}>
-                    <td className="px-3 py-1.5">
+                    <td className="px-3 py-1.5" data-label="SKU">
                       <input
                         className="field mono !py-1.5 text-xs"
                         aria-label={`SKU de ${label}`}
@@ -780,11 +790,11 @@ function VariantsSection({
                       />
                     </td>
                     {names.map((n) => (
-                      <td key={n} className={`px-3 py-1.5 ${f.options.find((o) => o.name === n)?.values.includes(v.options[n]) ? "" : "text-danger"}`}>
+                      <td key={n} data-label={n} className={`px-3 py-1.5 ${f.options.find((o) => o.name === n)?.values.includes(v.options[n]) ? "" : "text-danger"}`}>
                         {v.options[n] ?? "—"}
                       </td>
                     ))}
-                    <td className="px-3 py-1.5">
+                    <td className="px-3 py-1.5" data-label="Precio (€)">
                       <input
                         className="field mono w-28 !py-1.5 text-right"
                         inputMode="decimal"
@@ -794,7 +804,7 @@ function VariantsSection({
                         onChange={(e) => setVariant(i, { price: e.target.value })}
                       />
                     </td>
-                    <td className="px-3 py-1.5 text-center">
+                    <td className="px-3 py-1.5 text-center" data-label="En stock">
                       <input
                         type="checkbox"
                         className="h-5 w-5 accent-[var(--aji)]"

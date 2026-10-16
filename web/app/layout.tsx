@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Mono, Figtree } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ChatProvider } from "@/components/chat/ChatContext";
-import { ChatWidget } from "@/components/chat/ChatWidget";
+import { ChatGate } from "@/components/chat/ChatGate";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { CartDrawer } from "@/components/cart/CartDrawer";
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: { default: "Colchones Contoso · Cosidos a mano en Colombia", template: "%s · Colchones Contoso" },
   description:
-    "Colchones de matrimonio e individuales cosidos a mano en Medellín con algodón del Tolima. Envío gratis a la península y 30 noches de prueba.",
+    "Colchones de matrimonio e individuales cosidos a mano en Bogotá con algodón del Tolima. Envío gratis a la península y 30 noches de prueba.",
   openGraph: { locale: "es_ES", siteName: "Colchones Contoso", type: "website" },
   icons: { icon: "/icon.svg" },
 };
@@ -51,7 +51,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <SiteHeader />
             <main id="contenido">{children}</main>
             <SiteFooter />
-            <ChatWidget />
+            <ChatGate />
             <CartDrawer />
             <Toaster />
             <RevealObserver />

@@ -291,7 +291,7 @@ function StatusChanger({ order, onChanged }: { order: AdminOrder; onChanged: (o:
                 value={tracking}
                 maxLength={60}
                 required
-                placeholder="SE48201937"
+                placeholder="Escribe el número que da el transportista"
                 onChange={(e) => setTracking(e.target.value)}
               />
             </div>
