@@ -1,6 +1,6 @@
 # Envíos y devoluciones
 
-En Colchones Contoso fabricamos nuestros colchones en nuestro taller de Envigado (Antioquia, Colombia) y los enviamos a toda España desde nuestro almacén de Madrid. Todos los precios incluyen IVA y están en euros.
+En Colchones Contoso fabricamos nuestros colchones en nuestro taller de Bogotá (Colombia) y los enviamos a toda España desde nuestro almacén de Madrid. Todos los precios incluyen IVA y están en euros.
 
 ## Envíos
 

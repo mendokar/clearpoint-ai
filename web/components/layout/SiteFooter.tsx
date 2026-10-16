@@ -13,7 +13,7 @@ export function SiteFooter() {
               <b>contoso</b>
             </span>
           </Link>
-          <p>Colchones cosidos a mano en Medellín y enviados a toda España.</p>
+          <p>Colchones cosidos a mano en Bogotá y enviados a toda España.</p>
         </div>
         <div>
           <h4>Colchones</h4>

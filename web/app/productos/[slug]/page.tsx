@@ -66,7 +66,7 @@ export default async function ProductPage({ params }: Params) {
         <ProductGallery images={product.images} name={product.name} />
         <div className="enter flex flex-col gap-6">
           <div>
-            <span className="eyebrow">Hecho en Envigado · Algodón del Tolima</span>
+            <span className="eyebrow">Hecho en Bogotá · Algodón del Tolima</span>
             <h1 className="mt-2 mb-3 text-[clamp(2.2rem,4.4vw,3.4rem)] font-extrabold tracking-[-.025em]">{product.name}</h1>
             <p className="text-[1.05rem] text-muted">{product.shortDescription}</p>
             <p className="mt-2 text-sm text-muted">

@@ -8,7 +8,7 @@ import { useCart } from "@/lib/cart/store";
  * Inicia el pago con Stripe Checkout: envía solo SKU y cantidad (el servidor recalcula los precios)
  * y redirige a la URL que devuelve /api/checkout. Lo usan la página del carrito y el mini-carrito.
  */
-export function useCheckout() {
+export function useCheckout({ onFail }: { onFail?: () => void } = {}) {
   const { getToken } = useAuth();
   const lines = useCart((s) => s.lines);
   const [paying, setPaying] = useState(false);
@@ -31,6 +31,8 @@ export function useCheckout() {
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok || !data.url) {
         setError(data.error ?? "No hemos podido iniciar el pago. Inténtalo de nuevo.");
+        // Un producto retirado, agotado o con otro precio: se vuelve a comprobar el carrito para señalarlo.
+        if (res.status === 400 || res.status === 409) onFail?.();
         return;
       }
       window.location.assign(data.url);

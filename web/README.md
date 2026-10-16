@@ -1,6 +1,6 @@
 # web — Tienda Colchones Contoso (Next.js)
 
-Tienda online de **Colchones Contoso**, marca colombiana (taller en Envigado, algodón del Tolima) que vende
+Tienda online de **Colchones Contoso**, marca colombiana (taller en Bogotá, algodón del Tolima) que vende
 colchones de adulto en España, en euros. Esta carpeta contiene la web completa y su API de tienda: catálogo,
 configurador de producto, carrito, registro e inicio de sesión (correo o Google), pago con Stripe Checkout en
 modo test, webhook que crea el pedido, email de confirmación, "Mis pedidos" y el widget del asistente IA,
@@ -477,7 +477,7 @@ Web Animations API.
 - **Botones**: elevación al pasar el ratón, brillo que cruza el primario, `scale(.97)` al pulsar, flecha
   (`<ArrowRight />`, clase `btn-arrow`) que se desplaza. Foco visible con un pequeño "asentamiento" animado.
 - **Barra superior**: marquesina con cuatro mensajes (envío gratis, 30 noches, pago seguro con Stripe, cosido
-  en Medellín); se pausa al pasar el ratón, con el foco o con su botón de pausa (WCAG 2.2.2).
+  en Bogotá); se pausa al pasar el ratón, con el foco o con su botón de pausa (WCAG 2.2.2).
 - **Cabecera**: al salir de pantalla la barra superior, se compacta sin mover el contenido (`top` negativo del
   `sticky` + `translate`, sin CLS), gana sombra y logo más pequeño; subrayado animado en los enlaces; "bump"
   del contador del carrito al añadir; menú móvil con fundido, desplazamiento y enlaces escalonados (Escape lo

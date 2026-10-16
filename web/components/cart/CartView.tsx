@@ -8,12 +8,13 @@ import { AnimatedPrice } from "@/components/ui/AnimatedPrice";
 import { ArrowRight, LockIcon, MoonIcon, TruckIcon } from "@/components/ui/Icons";
 import { Notice } from "@/components/ui/Notice";
 import { Skeleton, SkeletonGroup, SkeletonRow } from "@/components/ui/Skeleton";
-import { cartCount, cartSubtotal, MAX_QTY_PER_LINE, useCart, type CartLine } from "@/lib/cart/store";
+import { cartCount, cartSubtotal, isPurchasable, MAX_QTY_PER_LINE, useCart, type CartLine } from "@/lib/cart/store";
 import { useHydrated } from "@/lib/cart/useHydrated";
 import { prefersReducedMotion } from "@/lib/motion/hooks";
 import { toast } from "@/lib/ui/toast";
 import { useCheckout } from "./useCheckout";
-import { formatOptions, orderedOptionEntries } from "@/lib/format";
+import { useCartQuote } from "./useCartQuote";
+import { formatOptions, formatPrice, orderedOptionEntries } from "@/lib/format";
 
 const LEAVE_MS = 260;
 
@@ -21,7 +22,8 @@ export function CartView() {
   const hydrated = useHydrated();
   const { lines, setQuantity, remove, add } = useCart();
   const { user, loading, configured } = useAuth();
-  const { checkout, paying, error } = useCheckout();
+  const { changes, refresh } = useCartQuote(hydrated && lines.length > 0);
+  const { checkout, paying, error } = useCheckout({ onFail: refresh });
   const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
   const listRef = useFlip(hydrated ? lines.length : -1);
 
@@ -29,6 +31,8 @@ export function CartView() {
   if (lines.length === 0) return <EmptyCart />;
 
   const subtotal = cartSubtotal(lines);
+  const blocked = lines.filter((l) => !isPurchasable(l));
+  const purchasableCount = cartCount(lines.filter(isPurchasable));
 
   const onRemove = (line: CartLine) => {
     setLeaving((s) => new Set(s).add(line.sku));
@@ -74,10 +78,24 @@ export function CartView() {
                   </Link>
                   <p className="text-sm text-muted">{orderedOptionEntries(line.options).map(([k, v]) => `${k}: ${v}`).join(" · ")}</p>
                   <p className="mono text-xs text-muted">SKU {line.sku}</p>
+                  {line.availability === "unavailable" && (
+                    <p className="mt-1 inline-block rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
+                      Ya no está a la venta
+                    </p>
+                  )}
+                  {line.availability === "out_of_stock" && (
+                    <p className="mt-1 inline-block rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
+                      Agotado en esta combinación
+                    </p>
+                  )}
                 </div>
-                <b className="font-display text-lg tabular-nums">
-                  <AnimatedPrice value={line.unitPrice * line.quantity} />
-                </b>
+                {isPurchasable(line) ? (
+                  <b className="font-display text-lg tabular-nums">
+                    <AnimatedPrice value={line.unitPrice * line.quantity} />
+                  </b>
+                ) : (
+                  <span className="text-sm text-muted">No suma al total</span>
+                )}
               </div>
               <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
                 <QuantityStepper
@@ -105,7 +123,7 @@ export function CartView() {
         </h2>
         <dl className="m-0 grid gap-2 text-[.95rem]">
           <div className="flex justify-between">
-            <dt className="text-muted">Productos ({cartCount(lines)})</dt>
+            <dt className="text-muted">Productos ({purchasableCount})</dt>
             <dd className="m-0 tabular-nums">
               <AnimatedPrice value={subtotal} />
             </dd>
@@ -125,6 +143,20 @@ export function CartView() {
           IVA incluido. El importe final se calcula en nuestro servidor con los precios vigentes y se confirma en la
           página de pago de Stripe.
         </p>
+        {changes.length > 0 && (
+          <div className="notice-in">
+            <Notice tone="info" title="Precios actualizados">
+              {changes.map((c) => `${c.name}: ${formatPrice(c.from)} → ${formatPrice(c.to)}`).join(" · ")}
+            </Notice>
+          </div>
+        )}
+        {blocked.length > 0 && (
+          <div className="notice-in">
+            <Notice tone="warn" title="Revisa tu carrito">
+              Quita {blocked.map((l) => l.name).join(", ")} para poder pagar: ya no se puede comprar.
+            </Notice>
+          </div>
+        )}
         {error && (
           <div className="notice-in">
             <Notice tone="error">{error}</Notice>
@@ -139,7 +171,7 @@ export function CartView() {
             <Skeleton className="h-[52px] w-full rounded-full" />
           </SkeletonGroup>
         ) : user ? (
-          <button type="button" className="btn btn-primary w-full" onClick={checkout} disabled={paying}>
+          <button type="button" className="btn btn-primary w-full" onClick={checkout} disabled={paying || blocked.length > 0}>
             {paying ? (
               <>
                 <span className="btn-spinner" aria-hidden="true" /> Redirigiendo al pago…

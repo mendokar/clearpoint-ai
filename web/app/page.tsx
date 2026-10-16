@@ -27,7 +27,7 @@ export default async function HomePage() {
               Dormir con la calma de una <em className="text-aji not-italic">siesta</em> en tierra caliente.
             </h1>
             <p className="max-w-[34rem] text-[1.15rem] text-muted">
-              Colchones de matrimonio e individuales cosidos a mano en Medellín con algodón colombiano. Eliges medida,
+              Colchones de matrimonio e individuales cosidos a mano en Bogotá con algodón colombiano. Eliges medida,
               núcleo y funda, y te lo llevamos a casa.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -170,10 +170,10 @@ export default async function HomePage() {
             </figure>
             <span className="eyebrow">El taller</span>
             <h2 id="taller-title" className="mt-2.5 mb-5 text-[clamp(1.9rem,3.6vw,2.8rem)] font-extrabold">
-              De un taller en Antioquia a tu dormitorio
+              De un taller en Bogotá a tu dormitorio
             </h2>
             <p className="mb-4 max-w-[36rem] text-muted">
-              Contoso nació en <strong className="text-ink">Envigado, Antioquia</strong>, en un taller familiar de
+              Contoso nació en <strong className="text-ink">Bogotá</strong>, en un taller familiar de
               tapicería. Allí aprendimos que dormir bien es como una buena siesta de mediodía: fresco, sin prisa y sin
               interrupciones.
             </p>
