@@ -740,3 +740,57 @@
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* QA (ronda 4): en móvil la tabla de variantes del panel obligaba a deslizar para ver precio y stock.
+   Por debajo de 640 px cada variante se muestra como una tarjeta con sus campos etiquetados. */
+@media (max-width: 640px) {
+  .variants-table {
+    min-width: 0 !important;
+  }
+  .variants-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .variants-table,
+  .variants-table tbody,
+  .variants-table tr,
+  .variants-table td {
+    display: block;
+    width: 100%;
+  }
+  .variants-table tr {
+    position: relative;
+    padding: 0.6rem 0.75rem 0.75rem;
+  }
+  .variants-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0 !important;
+    text-align: right;
+  }
+  .variants-table td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    font: 500 0.7rem var(--f-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .variants-table td:not([data-label]) {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.5rem;
+    width: auto;
+  }
+  .variants-table td[data-label="SKU"] {
+    padding-right: 2.75rem !important;
+  }
+  .variants-table td[data-label="SKU"] input {
+    max-width: 14rem;
+  }
+}

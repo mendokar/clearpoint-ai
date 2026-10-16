@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "seed": "tsx --env-file=.env seed.ts",
+    "seed:pedidos": "tsx --env-file=.env seed.ts --solo-pedidos",
     "order:status": "tsx --env-file=.env update-order-status.ts",
     "typecheck": "tsc --noEmit",
     "admin:set": "tsx --env-file=.env set-admin.ts",

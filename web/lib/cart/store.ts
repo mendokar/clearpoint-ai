@@ -15,6 +15,19 @@ export type CartLine = {
   unitPrice: number;
   image?: string;
   quantity: number;
+  /** Último estado comprobado con el servidor (ver /api/cart/quote). Sin valor = aún no comprobado. */
+  availability?: "ok" | "out_of_stock" | "unavailable";
+};
+
+export type PriceChange = { sku: string; name: string; from: number; to: number };
+
+export type QuoteUpdate = {
+  sku: string;
+  status: "ok" | "out_of_stock" | "unavailable";
+  unitPrice?: number;
+  name?: string;
+  slug?: string;
+  options?: Record<string, string>;
 };
 
 type CartState = {
@@ -23,6 +36,8 @@ type CartState = {
   setQuantity: (sku: string, quantity: number) => void;
   remove: (sku: string) => void;
   clear: () => void;
+  /** Aplica precios y disponibilidad del servidor. Devuelve los cambios de precio para avisar al cliente. */
+  applyQuote: (updates: QuoteUpdate[]) => PriceChange[];
 };
 
 const clampQty = (n: number) => Math.max(1, Math.min(MAX_QTY_PER_LINE, Math.floor(n)));
@@ -49,6 +64,28 @@ export const useCart = create<CartState>()(
         })),
       remove: (sku) => set((s) => ({ lines: s.lines.filter((l) => l.sku !== sku) })),
       clear: () => set({ lines: [] }),
+      applyQuote: (updates) => {
+        const bySku = new Map(updates.map((u) => [u.sku, u]));
+        const changes: PriceChange[] = [];
+        set((s) => ({
+          lines: s.lines.map((l) => {
+            const u = bySku.get(l.sku);
+            if (!u) return l;
+            if (u.status === "unavailable") return { ...l, availability: "unavailable" };
+            const price = typeof u.unitPrice === "number" ? u.unitPrice : l.unitPrice;
+            if (price !== l.unitPrice) changes.push({ sku: l.sku, name: u.name ?? l.name, from: l.unitPrice, to: price });
+            return {
+              ...l,
+              unitPrice: price,
+              name: u.name ?? l.name,
+              slug: u.slug ?? l.slug,
+              options: u.options ?? l.options,
+              availability: u.status,
+            };
+          }),
+        }));
+        return changes;
+      },
     }),
     {
       name: "contoso-cart",
@@ -63,6 +100,11 @@ export function cartCount(lines: CartLine[]): number {
   return lines.reduce((n, l) => n + l.quantity, 0);
 }
 
+/** Solo cuentan las líneas que se pueden comprar (las agotadas o retiradas no suman). */
+export function isPurchasable(line: CartLine): boolean {
+  return line.availability !== "unavailable" && line.availability !== "out_of_stock";
+}
+
 export function cartSubtotal(lines: CartLine[]): number {
-  return Math.round(lines.reduce((sum, l) => sum + l.unitPrice * 100 * l.quantity, 0)) / 100;
+  return Math.round(lines.filter(isPurchasable).reduce((sum, l) => sum + l.unitPrice * 100 * l.quantity, 0)) / 100;
 }

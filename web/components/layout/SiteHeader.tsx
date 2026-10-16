@@ -15,7 +15,7 @@ const TOPBAR = [
   { icon: TruckIcon, text: "Envío gratis a la España peninsular en 24 a 72 h" },
   { icon: MoonIcon, text: "30 noches de prueba en casa" },
   { icon: LockIcon, text: "Pago seguro con Stripe" },
-  { icon: NeedleIcon, text: "Cosido a mano en Medellín" },
+  { icon: NeedleIcon, text: "Cosido a mano en Bogotá" },
 ];
 
 const NAV = [
