@@ -2,7 +2,7 @@
 
 Prueba técnica para el puesto de **Desarrollador Full Stack AI Native** en Clearpoint.
 
-Contoso es una tienda online de colchones de adulto con identidad colombiana: taller en Envigado (Antioquia), fundas de algodón del Tolima y envíos a toda España. Permite configurar un colchón, comprarlo con un pago de prueba de Stripe y consultar después el pedido con un asistente de IA.
+Contoso es una tienda online de colchones de adulto con identidad colombiana: taller en Bogotá, fundas de algodón del Tolima y envíos a toda España. Permite configurar un colchón, comprarlo con un pago de prueba de Stripe y consultar después el pedido con un asistente de IA.
 
 > **Estado:** en desarrollo. La tabla de [Estado del proyecto](#estado-del-proyecto) dice qué está terminado y qué falta. Este README se actualiza en cada iteración.
 
